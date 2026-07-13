@@ -104,9 +104,11 @@ PROXY_FAIL_CLOSED = os.environ.get('PROXY_FAIL_CLOSED', 'true').lower() in ('1',
 RL_INIT_PER_TENANT = os.environ.get('RL_INIT_PER_TENANT', '60,3600')
 RL_CHALLENGE_PER_TENANT = os.environ.get('RL_CHALLENGE_PER_TENANT', '120,3600')
 RL_REDEEM_PER_TENANT = os.environ.get('RL_REDEEM_PER_TENANT', '120,3600')
+RL_VERIFY_PER_TENANT = os.environ.get('RL_VERIFY_PER_TENANT', '120,3600')
 RL_GLOBAL_INIT = os.environ.get('RL_GLOBAL_INIT', '1000,3600')
 RL_GLOBAL_CHALLENGE = os.environ.get('RL_GLOBAL_CHALLENGE', '2000,3600')
 RL_GLOBAL_REDEEM = os.environ.get('RL_GLOBAL_REDEEM', '2000,3600')
+RL_GLOBAL_VERIFY = os.environ.get('RL_GLOBAL_VERIFY', '2000,3600')
 
 MIN_DIFFICULTY = os.environ.get('MIN_DIFFICULTY', '')
 DIFFICULTY_NEW_IP = os.environ.get('DIFFICULTY_NEW_IP', '')
@@ -274,6 +276,15 @@ def init_db():
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_s ON sessions(tenant_id, expires)")
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS verified_tokens (
+                jti TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL DEFAULT '',
+                verified_at REAL NOT NULL,
+                expires REAL NOT NULL
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_vt ON verified_tokens(tenant_id, expires)")
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS failed_attempts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 tenant_id TEXT NOT NULL DEFAULT '',
@@ -398,6 +409,7 @@ def _cleanup():
             for table, col, window in [
                 ("challenges", "expires", 0),
                 ("sessions", "expires", 0),
+                ("verified_tokens", "expires", 0),
                 ("rate_limits", "timestamp", min(3600, retention)),
                 ("rate_limits_tenant", "timestamp", min(3600, retention)),
                 ("rate_limits_global", "timestamp", min(3600, retention)),
@@ -1539,6 +1551,67 @@ def redeem():
 
     log_failure(ip, '/redeem', 'bad_pow', challenge_id, tenant_id=tenant_id)
     return jsonify({"success": False, "error": "Incorrect solution"}), 403
+
+
+@app.route('/verify', methods=['POST'])
+def verify_token():
+    """Verifica server-to-server un token emitido por /redeem, sin exponer SECRET_KEY.
+    Consume el token (single-use) marcando su jti en verified_tokens."""
+    ip = get_client_ip()
+    tenant_id = current_tenant()
+
+    status = check_account_status(tenant_id)
+    if not status['ok']:
+        log_failure(ip, '/verify', 'account_' + status.get('status', 'inactive'), tenant_id=tenant_id)
+        return jsonify({"success": False, "valid": False, "error": status['error'], "support_url": status.get('support_url')}), 402
+
+    if not check_rate_limit(ip, '/verify', 20, 60, tenant_id=tenant_id):
+        log_failure(ip, '/verify', 'rate_limit', tenant_id=tenant_id)
+        return jsonify({"success": False, "valid": False, "error": "Too many requests. Try again later."}), 429
+
+    if not check_rate_limit_tenant(tenant_id, '/verify', RL_VERIFY_PER_TENANT):
+        log_failure(ip, '/verify', 'rate_limit_tenant', tenant_id=tenant_id)
+        return jsonify({"success": False, "valid": False, "error": "Too many requests. Try again later."}), 429
+
+    if not check_rate_limit_global('/verify', RL_GLOBAL_VERIFY):
+        log_failure(ip, '/verify', 'rate_limit_global', tenant_id=tenant_id)
+        return jsonify({"success": False, "valid": False, "error": "Too many requests. Try again later."}), 429
+
+    data = request.get_json(silent=True) or {}
+    token = data.get('token')
+    if not token:
+        return jsonify({"success": False, "valid": False, "error": "token required"}), 400
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        log_failure(ip, '/verify', 'token_expired', tenant_id=tenant_id)
+        return jsonify({"success": True, "valid": False, "error": "expired"})
+    except Exception:
+        log_failure(ip, '/verify', 'bad_token', tenant_id=tenant_id)
+        return jsonify({"success": True, "valid": False, "error": "invalid"})
+
+    if payload.get('sub') != 'human':
+        log_failure(ip, '/verify', 'bad_subject', tenant_id=tenant_id)
+        return jsonify({"success": True, "valid": False, "error": "invalid"})
+
+    jti = payload.get('jti')
+    if not jti:
+        log_failure(ip, '/verify', 'missing_jti', tenant_id=tenant_id)
+        return jsonify({"success": True, "valid": False, "error": "invalid"})
+
+    try:
+        with get_db() as conn:
+            conn.execute(
+                "INSERT INTO verified_tokens (jti, tenant_id, verified_at, expires) VALUES (?, ?, ?, ?)",
+                (jti, tenant_id, time.time(), payload.get('exp', time.time()))
+            )
+    except Exception:
+        log_failure(ip, '/verify', 'token_reuse', tenant_id=tenant_id)
+        return jsonify({"success": True, "valid": False, "error": "token already used"})
+
+    update_account_last_seen(tenant_id)
+    return jsonify({"success": True, "valid": True})
 
 
 def _create_account_from_request(data):
