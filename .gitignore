@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+*.eggs/
+dist/
+build/
+
+# Flask / entorno
+.env
+.env.*
+*.log
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+*.db.legacy-*
+*.legacy-*
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS / sistema
+.DS_Store
+Thumbs.db

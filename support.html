@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Menta CAPTCHA Anonymous Support Center</title>
+<link rel="icon" type="image/svg+xml" href="/menta-logo.svg">
+<style>
+  :root { --menta: #22C55E; }
+  body { font-family: "Courier New", monospace; margin: 0; padding: 2rem 0; background: #fff; color: #000; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 0 1rem; }
+  h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+  hr { border: none; border-top: 2px solid #000; margin: 1rem 0; }
+  .nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.5rem; }
+  .nav .links { margin: 0; }
+  p { max-width: 48rem; line-height: 1.6; margin-bottom: 1.25rem; }
+  a { color: #000; }
+  a:hover { background: #000; color: #fff; }
+  .form { margin: 1.5rem 0; }
+  input[type="text"], textarea {
+    font-family: "Courier New", monospace;
+    padding: 0.75rem;
+    border: 1px solid #000;
+    width: 420px;
+    max-width: 100%;
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+  input[type="text"]:focus, textarea:focus {
+    outline: none;
+    border-color: var(--menta);
+  }
+  textarea { height: 6rem; }
+  button {
+    font-family: "Courier New", monospace;
+    padding: 0.5rem 1rem;
+    border: 1px solid #000;
+    background: #000;
+    color: #fff;
+    cursor: pointer;
+  }
+  button:hover { background: var(--menta); color: #000; }
+  .cta {
+    background: var(--menta);
+    color: #000;
+    border: 1px solid var(--menta);
+  }
+  .cta:hover { filter: brightness(0.95); }
+  .error { color: #c00; margin-top: 1rem; }
+  .success { color: #070; margin-top: 1rem; }
+  .warning { color: #c70; margin-top: 1rem; }
+  h2 { margin-top: 2.5rem; margin-bottom: 1rem; }
+  .footer { margin-top: 2rem; color: #999; font-size: 0.8rem; }
+  .ticket { border: 1px solid #000; padding: 1rem; margin: 1rem 0; max-width: 48rem; }
+  .ticket .meta { color: #555; font-size: 0.85rem; margin-bottom: 0.5rem; }
+  .chat { margin: 0.75rem 0; padding: 0.75rem; border: 1px solid #000; max-width: 42rem; }
+  .chat .meta { font-size: 0.75rem; color: #555; margin-bottom: 0.25rem; }
+  .chat.admin { background: #f0f0f0; }
+  .chat.user { background: #fff; }
+  .secret-link {
+    background: #f0f0f0;
+    padding: 0.5rem;
+    word-break: break-all;
+    display: block;
+    margin: 0.5rem 0;
+  }
+</style>
+</head>
+<body>
+
+{% include 'nav.html' %}
+<div class="container">
+
+<div id="form-view">
+  <h2>Anonymous Support Center</h2>
+  <p>We value your privacy. No email, name, or personal data is required. After submitting, you will receive a secret link. <strong>Save it in your favorites</strong> — it is the only way to access your ticket.</p>
+  <p>You can optionally provide a <a href="https://ntfy.sh" target="_blank">ntfy</a> topic to receive a generic notification when we reply. We will only send: "You have a new message at <em>link</em>".</p>
+
+  <p><strong>Quick templates:</strong>
+    <button type="button" class="template-btn" data-subject="Domain ownership claim" data-message="I want to claim the domain [your-domain.com] for my account. The account number is [your-account-number].">Domain claim</button>
+    <button type="button" class="template-btn" data-subject="Trial activation" data-message="I would like to activate my SaaS account after the 45-day trial. My account number is [your-account-number].">Activate</button>
+    <button type="button" class="template-btn" data-subject="Account reactivation" data-message="My account [your-account-number] has expired. I would like to reactivate it. Please let me know the next steps.">Reactivate</button>
+    <button type="button" class="template-btn" data-subject="Domain not authorized" data-message="My widget shows that the domain is not registered or authorized by Menta. My account number is [your-account-number] and my domain is [your-domain.com].">Not authorized</button>
+    <button type="button" class="template-btn" data-subject="Account deletion request" data-message="Please delete my Menta account and all associated data. My account number is [your-account-number].">Delete account</button>
+    <button type="button" class="template-btn" data-subject="General question" data-message="I have a question about Menta. [Write your question here].">Question</button>
+  </p>
+
+  <div class="form" role="form" aria-label="Support ticket">
+    <label for="subject">Subject:</label>
+    <input type="text" id="subject" placeholder="e.g. Domain ownership claim, Trial activation">
+    <label for="message">Message:</label>
+    <textarea id="message" placeholder="Describe your issue. If this is a claim, include the account number or domain."></textarea>
+    <label for="ntfy-topic">ntfy topic (optional):</label>
+    <input type="text" id="ntfy-topic" placeholder="my-menta-alerts">
+    <label for="account-number">Account number (optional):</label>
+    <input type="text" id="account-number" placeholder="16-digit number">
+    <button id="submit-ticket" class="cta" type="button">Send ticket</button>
+  </div>
+  <div id="ticket-error" class="error" style="display:none;" role="status" aria-live="polite"></div>
+  <div id="ticket-success" class="success" style="display:none;" role="status" aria-live="polite"></div>
+</div>
+
+<div id="ticket-view" style="display:none;">
+  <p class="warning"><strong>Keep this link safe.</strong> It is the only way to access your ticket.</p>
+  <h3 id="ticket-subject"></h3>
+  <div class="meta" id="ticket-meta"></div>
+  <div class="ticket">
+    <div id="ticket-message"></div>
+    <div id="ticket-replies"></div>
+  </div>
+  <div id="closed-message" class="warning" style="display:none;" role="status" aria-live="polite">This ticket is closed.</div>
+  <div id="reply-form" class="form" role="form" aria-label="Reply to ticket">
+    <label for="reply-body">Reply:</label>
+    <textarea id="reply-body"></textarea>
+    <button id="send-reply" type="button">Send reply</button>
+  </div>
+  <div id="reply-error" class="error" style="display:none;" role="status" aria-live="polite"></div>
+</div>
+
+{% include 'footer.html' %}
+
+<script>
+  const urlParams = new URLSearchParams(location.search);
+  const ticketId = urlParams.get('ticket_id') || '';
+  const pathMatch = location.pathname.match(/\/support\/([^/]+)/);
+  const secretId = ticketId || (pathMatch ? pathMatch[1] : '');
+  const adminToken = urlParams.get('token') || '';
+
+  if (secretId) {
+    document.getElementById('form-view').style.display = 'none';
+    document.getElementById('ticket-view').style.display = 'block';
+    loadTicket(secretId);
+  }
+
+  function formatTime(ts) {
+    return new Date(ts * 1000).toLocaleString();
+  }
+
+  async function loadTicket(id) {
+    try {
+      const r = await fetch('/support/ticket/' + encodeURIComponent(id));
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
+      const t = data.ticket;
+      document.getElementById('ticket-meta').textContent = 'Opened: ' + formatTime(t.created_at) + ' | Status: ' + t.status;
+      document.getElementById('ticket-subject').textContent = t.subject;
+      const msgEl = document.getElementById('ticket-message');
+      msgEl.innerHTML = '<div class="chat user"><div class="meta">anonymous user &middot; ' + formatTime(t.created_at) + '</div>' + t.message + '</div>';
+      const repliesEl = document.getElementById('ticket-replies');
+      repliesEl.innerHTML = '';
+      for (const rep of data.replies) {
+        const isAdmin = rep.author === 'admin';
+        const label = isAdmin ? 'Menta team' : 'anonymous user';
+        const div = document.createElement('div');
+        div.className = 'chat ' + (isAdmin ? 'admin' : 'user');
+        div.innerHTML = '<div class="meta">' + label + ' &middot; ' + formatTime(rep.created_at) + '</div>' + rep.body;
+        repliesEl.appendChild(div);
+      }
+      const replyForm = document.getElementById('reply-form');
+      const closedMessage = document.getElementById('closed-message');
+      if (t.status === 'closed' && !adminToken) {
+        replyForm.style.display = 'none';
+        closedMessage.style.display = 'block';
+      } else {
+        replyForm.style.display = 'block';
+        closedMessage.style.display = 'none';
+      }
+    } catch (e) {
+      document.getElementById('reply-error').textContent = e.message;
+      document.getElementById('reply-error').style.display = 'block';
+    }
+  }
+
+  document.getElementById('submit-ticket').addEventListener('click', async () => {
+    const errEl = document.getElementById('ticket-error');
+    const okEl = document.getElementById('ticket-success');
+    errEl.style.display = 'none';
+    okEl.style.display = 'none';
+    try {
+      const r = await fetch('/support/ticket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject: document.getElementById('subject').value,
+          message: document.getElementById('message').value,
+          ntfy_topic: document.getElementById('ntfy-topic').value,
+          account_number: document.getElementById('account-number').value
+        })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
+      okEl.innerHTML = '<strong>Ticket created.</strong><br>Save this secret link:<br><a class="secret-link" href="' + data.link + '">' + data.link + '</a>';
+      okEl.style.display = 'block';
+      document.getElementById('subject').value = '';
+      document.getElementById('message').value = '';
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+    }
+  });
+
+  for (const btn of document.querySelectorAll('.template-btn')) {
+    btn.addEventListener('click', () => {
+      document.getElementById('subject').value = btn.dataset.subject;
+      document.getElementById('message').value = btn.dataset.message;
+    });
+  }
+
+  document.getElementById('send-reply').addEventListener('click', async () => {
+    if (!secretId) return;
+    const errEl = document.getElementById('reply-error');
+    errEl.style.display = 'none';
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (adminToken) {
+        headers['Authorization'] = 'Bearer ' + adminToken;
+      }
+      const r = await fetch('/support/ticket/' + encodeURIComponent(secretId) + '/reply', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ body: document.getElementById('reply-body').value })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
+      document.getElementById('reply-body').value = '';
+      await loadTicket(secretId);
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+    }
+  });
+</script>
+
+</div>
+</body>
+</html>

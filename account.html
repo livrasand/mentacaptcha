@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get started with Menta</title>
+<link rel="icon" type="image/svg+xml" href="/menta-logo.svg">
+<style>
+  :root { --menta: #22C55E; }
+  body { font-family: "Courier New", monospace; margin: 0; padding: 2rem 0; background: #fff; color: #000; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 0 1rem; }
+  h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+  hr { border: none; border-top: 2px solid #000; margin: 1rem 0; }
+  a { color: #000; }
+  a:hover { background: #000; color: #fff; }
+  .nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.5rem; }
+  .nav .links { margin: 0; }
+  .form { margin: 1.5rem 0; max-width: 800px; }
+  button {
+    font-family: "Courier New", monospace;
+    padding: 0.5rem 1rem;
+    border: 1px solid #000;
+    background: #000;
+    color: #fff;
+    cursor: pointer;
+  }
+  button:hover { background: var(--menta); color: #000; }
+  .error { color: #c00; margin-top: 1rem; }
+  .success { color: #070; margin-top: 1rem; }
+  .warning { color: #c70; margin-top: 1rem; }
+  input[type="text"], input[type="password"], textarea {
+    font-family: "Courier New", monospace;
+    padding: 0.75rem;
+    border: 1px solid #000;
+    width: 300px;
+    max-width: 100%;
+  }
+  input[type="text"]:focus, input[type="password"]:focus, textarea:focus {
+    outline: none;
+    border-color: var(--menta);
+  }
+  textarea { height: 5rem; }
+  .account-number {
+    font-size: 1.2rem;
+    font-weight: 700;
+    background: #f0f0f0;
+    padding: 0.5rem;
+    display: inline-block;
+    margin: 0.5rem 0;
+  }
+  .banner {
+    border: 1px solid #000;
+    padding: 1rem;
+    margin: 1rem 0;
+    background: #f9f9f9;
+  }
+  .banner.trial { border-left: 4px solid #070; }
+  .banner.expired { border-left: 4px solid #c00; }
+  .banner.pending { border-left: 4px solid #c70; }
+  select {
+    font-family: "Courier New", monospace;
+    padding: 0.5rem;
+    border: 1px solid #000;
+    width: 300px;
+    max-width: 100%;
+  }
+  h2 { margin-top: 2.5rem; margin-bottom: 1rem; }
+  h3 { margin-top: 1.5rem; margin-bottom: 0.75rem; }
+  .footer { margin-top: 2rem; color: #999; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+
+{% include 'nav.html' %}
+<div class="container">
+
+<div id="auth-section">
+  <p>SaaS accounts are tied to a domain and come with a 45-day free trial. Activation is verified manually with cryptocurrency for privacy. All support is anonymous.</p>
+
+  <h2>Register</h2>
+  <div class="form" role="form" aria-label="Register account">
+    <label for="register-domains">Allowed origins (comma-separated):</label><br>
+    <input type="text" id="register-domains" placeholder="https://example.com, https://app.example.com" aria-describedby="register-error register-success" style="width: 420px;"><br>
+    <label for="register-plan">Plan:</label><br>
+    <select id="register-plan">
+      <option value="beginner">Beginner ($1/mo or $10/yr, 1 domain)</option>
+      <option value="developer">Developer ($5/mo or $50/yr, unlimited domains)</option>
+    </select><br>
+    <label for="register-ntfy">ntfy topic (optional):</label><br>
+    <input type="text" id="register-ntfy" placeholder="my-menta-alerts" style="width: 300px;"><br>
+    <label for="register-notes">Notes (optional):</label><br>
+    <input type="text" id="register-notes" placeholder="Customer note" style="width: 420px;"><br>
+    <button id="register-account" type="button">Register</button>
+  </div>
+  <div id="register-error" class="error" style="display:none;" role="status" aria-live="polite"></div>
+  <div id="register-success" class="success" style="display:none;" role="status" aria-live="polite"></div>
+
+  <h2>Login</h2>
+  <div class="form" role="form" aria-label="Account login">
+    <label for="account-number">Account number:</label><br>
+    <input type="text" id="account-number" placeholder="16-digit account number" aria-describedby="login-error" style="width: 220px;"><br>
+    <label for="account-totp-code">TOTP code (if 2FA enabled):</label><br>
+    <input type="text" id="account-totp-code" placeholder="000000" style="width: 220px;"><br>
+    <label for="account-recovery-code">Recovery code (if no TOTP):</label><br>
+    <input type="text" id="account-recovery-code" placeholder="8-digit code" style="width: 220px;"><br>
+    <label style="display:block;margin:0.5rem 0;">
+      <input type="checkbox" id="remember-account" style="width:auto;"> Remember me for 30 days
+    </label>
+    <button id="login-account" type="button">Login</button>
+  </div>
+  <div id="login-error" class="error" style="display:none;" role="status" aria-live="polite"></div>
+</div>
+
+<div id="login-status" class="banner" style="display:none;" role="status" aria-live="polite"></div>
+
+<div id="account-management" style="display:none;">
+  <button id="logout-account" type="button" style="background:#fff;color:#000;">Logout</button>
+  <h2>Account settings</h2>
+
+  <h3>Manage domains</h3>
+  <div class="form" role="form" aria-label="Manage domains">
+    <label for="account-domains">Allowed origins:</label><br>
+    <textarea id="account-domains" aria-describedby="domains-error domains-success"></textarea><br>
+    <button id="save-domains" type="button">Save domains</button>
+  </div>
+  <div id="domains-error" class="error" style="display:none;" role="status" aria-live="polite"></div>
+  <div id="domains-success" class="success" style="display:none;" role="status" aria-live="polite"></div>
+
+  <h3>Two-factor authentication</h3>
+  <div id="account-2fa-setup" style="display:none;">
+    <button id="setup-account-2fa" type="button">Setup 2FA</button>
+    <p>Scan the QR code with your authenticator app, then enter the 6-digit code to enable 2FA.</p>
+    <div id="account-2fa-qr" style="margin: 1rem 0;"></div>
+    <label for="account-2fa-code">Verification code:</label><br>
+    <input type="text" id="account-2fa-code" placeholder="000000" style="width: 220px;"><br>
+    <button id="verify-account-2fa" type="button">Enable 2FA</button>
+    <div id="account-2fa-result" class="success" style="display:none;" role="status" aria-live="polite"></div>
+  </div>
+  <div id="account-2fa-enabled" style="display:none;">
+    <p>2FA is enabled for this account.</p>
+    <label for="account-2fa-disable-code">TOTP or recovery code to disable:</label><br>
+    <input type="text" id="account-2fa-disable-code" placeholder="000000" style="width: 220px;">
+    <button id="disable-account-2fa" type="button" style="background:#fff;color:#000;">Disable 2FA</button>
+  </div>
+</div>
+
+<h2>Support</h2>
+<p><a href="/support">Open an anonymous support ticket</a> if you need to activate your account, claim a domain or have any question. No email or personal data is required. You can optionally add an <a href="https://ntfy.sh" target="_blank">ntfy</a> topic to get a discreet notification when we reply.</p>
+
+{% include 'footer.html' %}
+
+<script>
+  let currentAccountToken = null;
+  let account2faSecret = '';
+  let registeredAccountData = null;
+  const rememberAccountEl = document.getElementById('remember-account');
+  const ACCOUNT_SESSION_TOKEN_KEY = 'menta_account_token';
+  const ACCOUNT_SESSION_EXPIRY_KEY = 'menta_account_token_expires';
+
+  function accountHeaders(contentType) {
+    const headers = {};
+    if (currentAccountToken) headers['Authorization'] = 'Bearer ' + currentAccountToken;
+    if (contentType) headers['Content-Type'] = 'application/json';
+    return headers;
+  }
+
+  function showAccountDashboard(token, account) {
+    currentAccountToken = token;
+    document.getElementById('auth-section').style.display = 'none';
+    document.getElementById('account-management').style.display = 'block';
+    const statusEl = document.getElementById('login-status');
+    document.getElementById('account-domains').value = account.domains;
+    updateAccount2FAUI(account.totp_enabled);
+    statusEl.className = 'banner ' + (account.status === 'trial' ? 'trial' : (account.status === 'active' ? '' : 'expired'));
+    if (account.status === 'trial') {
+      statusEl.innerHTML = '<strong>Trial active.</strong> ' + (account.trial_days_left || 0) + ' day(s) left. <a href="/support">Contact support to activate</a>.';
+    } else if (account.status === 'active') {
+      statusEl.innerHTML = '<strong>Account active.</strong> Plan: ' + account.plan + '.';
+    } else if (account.status === 'pending_claim') {
+      statusEl.className = 'banner pending';
+      statusEl.innerHTML = '<strong>Account pending domain verification.</strong> <a href="/support">Open a support claim</a>.';
+    } else {
+      statusEl.innerHTML = '<strong>Account inactive.</strong> <a href="/support">Contact support to reactivate</a>.';
+    }
+    statusEl.style.display = 'block';
+  }
+
+  function saveAccountSession() {
+    try {
+      if (currentAccountToken && rememberAccountEl.checked) {
+        localStorage.setItem(ACCOUNT_SESSION_TOKEN_KEY, currentAccountToken);
+        localStorage.setItem(ACCOUNT_SESSION_EXPIRY_KEY, String(Date.now() + (30 * 24 * 60 * 60 * 1000)));
+      }
+    } catch (e) {}
+  }
+
+  function clearAccountSession() {
+    try {
+      localStorage.removeItem(ACCOUNT_SESSION_TOKEN_KEY);
+      localStorage.removeItem(ACCOUNT_SESSION_EXPIRY_KEY);
+    } catch (e) {}
+  }
+
+  function loadAccountSession() {
+    try {
+      const token = localStorage.getItem(ACCOUNT_SESSION_TOKEN_KEY);
+      const expires = parseInt(localStorage.getItem(ACCOUNT_SESSION_EXPIRY_KEY) || '0', 10);
+      if (token && Date.now() < expires) {
+        return token;
+      }
+      clearAccountSession();
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function restoreAccountSession() {
+    const token = loadAccountSession();
+    if (!token) return;
+    try {
+      const r = await fetch('/admin/account', { headers: { 'Authorization': 'Bearer ' + token } });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
+      showAccountDashboard(token, data.account);
+    } catch (e) {
+      clearAccountSession();
+    }
+  }
+
+  function logoutAccount() {
+    currentAccountToken = null;
+    account2faSecret = '';
+    registeredAccountData = null;
+    clearAccountSession();
+    document.getElementById('auth-section').style.display = 'block';
+    document.getElementById('account-management').style.display = 'none';
+    document.getElementById('login-status').style.display = 'none';
+    document.getElementById('account-number').value = '';
+    document.getElementById('account-totp-code').value = '';
+    document.getElementById('account-recovery-code').value = '';
+    rememberAccountEl.checked = false;
+  }
+
+  async function registerAccount() {
+    const domains = document.getElementById('register-domains').value;
+    const plan = document.getElementById('register-plan').value;
+    const ntfy_topic = document.getElementById('register-ntfy').value;
+    const notes = document.getElementById('register-notes').value;
+    const errEl = document.getElementById('register-error');
+    const okEl = document.getElementById('register-success');
+    errEl.style.display = 'none';
+    okEl.style.display = 'none';
+    try {
+      const r = await fetch('/account/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domains, plan, ntfy_topic, notes })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
+      registeredAccountData = data;
+      let html = '<strong>Account created.</strong> Number: <span class="account-number" id="registered-account-number">' + data.account_number + '</span><br>' + data.warning;
+      if (data.primary_domain) html += '<br>Primary domain: ' + data.primary_domain;
+      if (data.trial_days) html += '<br>Trial: ' + data.trial_days + ' days';
+      if (data.domain_alert) html += '<br><span class="warning">' + data.domain_alert + '</span>';
+      html += '<br><button type="button" id="copy-account-number" style="background:#fff;color:#000;margin-top:0.5rem;">Copy number</button> ';
+      html += '<button type="button" id="download-account-txt" style="background:#fff;color:#000;margin-top:0.5rem;">Download .txt</button>';
+      okEl.innerHTML = html;
+      okEl.style.display = 'block';
+      document.getElementById('copy-account-number').addEventListener('click', copyAccountNumber);
+      document.getElementById('download-account-txt').addEventListener('click', downloadAccountTxt);
+      document.getElementById('register-domains').value = '';
+      document.getElementById('register-ntfy').value = '';
+      document.getElementById('register-notes').value = '';
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+    }
+  }
+
+  async function copyAccountNumber() {
+    if (!registeredAccountData) return;
+    const number = registeredAccountData.account_number;
+    try {
+      await navigator.clipboard.writeText(number);
+      const btn = document.getElementById('copy-account-number');
+      if (btn) {
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = original; }, 1500);
+      }
+    } catch (e) {
+      const el = document.getElementById('register-success');
+      if (el) {
+        el.innerHTML += '<br><span class="error">Could not copy to clipboard. Please select and copy the number manually.</span>';
+      }
+    }
+  }
+
+  function downloadAccountTxt() {
+    if (!registeredAccountData) return;
+    const lines = [
+      'Menta account number: ' + registeredAccountData.account_number,
+      'Primary domain: ' + (registeredAccountData.primary_domain || ''),
+      'Plan: ' + (registeredAccountData.plan || ''),
+      'Trial days: ' + (registeredAccountData.trial_days || 0),
+      'Status: ' + (registeredAccountData.status || ''),
+      '',
+      registeredAccountData.warning || 'Save this number. It will not be shown again.'
+    ];
+    if (registeredAccountData.domain_alert) {
+      lines.push('', 'Domain alert: ' + registeredAccountData.domain_alert);
+    }
+    const text = lines.join('\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'menta-account-' + registeredAccountData.account_number + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  async function loginAccount() {
+    const number = document.getElementById('account-number').value.trim();
+    const totpCode = document.getElementById('account-totp-code').value.trim();
+    const recoveryCode = document.getElementById('account-recovery-code').value.trim();
+    const errEl = document.getElementById('login-error');
+    const statusEl = document.getElementById('login-status');
+    errEl.style.display = 'none';
+    statusEl.style.display = 'none';
+    document.getElementById('domains-error').style.display = 'none';
+    document.getElementById('domains-success').style.display = 'none';
+    try {
+      const r = await fetch('/admin/account/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account_number: number, totp_code: totpCode, recovery_code: recoveryCode })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
+      showAccountDashboard(data.token, data.account);
+      saveAccountSession();
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+      document.getElementById('account-management').style.display = 'none';
+      statusEl.style.display = 'none';
+    }
+  }
+
+  function updateAccount2FAUI(enabled) {
+    document.getElementById('account-2fa-setup').style.display = enabled ? 'none' : 'block';
+    document.getElementById('account-2fa-enabled').style.display = enabled ? 'block' : 'none';
+    document.getElementById('account-2fa-result').style.display = 'none';
+  }
+
+  async function setupAccount2FA() {
+    const resultEl = document.getElementById('account-2fa-result');
+    resultEl.style.display = 'none';
+    resultEl.className = 'success';
+    try {
+      const r = await fetch('/admin/account/totp/setup', { method: 'POST', headers: accountHeaders(true) });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
+      account2faSecret = data.secret;
+      document.getElementById('account-2fa-qr').innerHTML = '<img src="data:image/svg+xml;base64,' + data.qr + '" alt="QR" style="max-width:240px;border:1px solid #000;"><br><code>' + data.uri + '</code>';
+      document.getElementById('account-2fa-setup').style.display = 'block';
+    } catch (e) {
+      resultEl.textContent = e.message;
+      resultEl.className = 'error';
+      resultEl.style.display = 'block';
+    }
+  }
+
+  async function verifyAccount2FA() {
+    const code = document.getElementById('account-2fa-code').value.trim();
+    const resultEl = document.getElementById('account-2fa-result');
+    resultEl.style.display = 'none';
+    try {
+      const r = await fetch('/admin/account/totp/verify', {
+        method: 'POST',
+        headers: accountHeaders(true),
+        body: JSON.stringify({ secret: account2faSecret, code })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
+      resultEl.innerHTML = '<strong>2FA enabled.</strong> Save these recovery codes, they will not be shown again:<br><code>' + (data.recovery_codes || []).join('</code> <code>') + '</code>';
+      resultEl.className = 'success';
+      resultEl.style.display = 'block';
+      updateAccount2FAUI(true);
+    } catch (e) {
+      resultEl.textContent = e.message;
+      resultEl.className = 'error';
+      resultEl.style.display = 'block';
+    }
+  }
+
+  async function disableAccount2FA() {
+    const code = document.getElementById('account-2fa-disable-code').value.trim();
+    const resultEl = document.getElementById('account-2fa-result');
+    resultEl.style.display = 'none';
+    try {
+      const r = await fetch('/admin/account/totp/disable', {
+        method: 'POST',
+        headers: accountHeaders(true),
+        body: JSON.stringify({ code })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
+      resultEl.textContent = '2FA disabled.';
+      resultEl.className = 'success';
+      resultEl.style.display = 'block';
+      updateAccount2FAUI(false);
+    } catch (e) {
+      resultEl.textContent = e.message;
+      resultEl.className = 'error';
+      resultEl.style.display = 'block';
+    }
+  }
+
+  async function saveDomains() {
+    const domains = document.getElementById('account-domains').value;
+    const errEl = document.getElementById('domains-error');
+    const okEl = document.getElementById('domains-success');
+    errEl.style.display = 'none';
+    okEl.style.display = 'none';
+    try {
+      const r = await fetch('/admin/account/domains', {
+        method: 'POST',
+        headers: accountHeaders(true),
+        body: JSON.stringify({ domains })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
+      okEl.textContent = 'Domains saved.';
+      okEl.style.display = 'block';
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+    }
+  }
+
+  document.getElementById('register-account').addEventListener('click', registerAccount);
+  document.getElementById('login-account').addEventListener('click', loginAccount);
+  document.getElementById('save-domains').addEventListener('click', saveDomains);
+  document.getElementById('logout-account').addEventListener('click', logoutAccount);
+  document.getElementById('account-number').addEventListener('keydown', (e) => { if (e.key === 'Enter') loginAccount(); });
+  document.getElementById('setup-account-2fa').addEventListener('click', setupAccount2FA);
+  document.getElementById('verify-account-2fa').addEventListener('click', verifyAccount2FA);
+  document.getElementById('disable-account-2fa').addEventListener('click', disableAccount2FA);
+  restoreAccountSession();
+</script>
+</div>
+</body>
+</html>

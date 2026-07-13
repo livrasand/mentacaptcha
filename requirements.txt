@@ -1,0 +1,6 @@
+flask
+PyJWT
+python-dotenv
+pyotp
+qrcode
+sqlcipher3

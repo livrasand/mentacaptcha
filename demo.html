@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Menta — Demo</title>
+<link rel="icon" type="image/svg+xml" href="/menta-logo.svg">
+<script src="/menta-captcha.js"></script>
+<style>
+  :root { --menta: #22C55E; }
+  body { font-family: "Courier New", monospace; margin: 0; padding: 2rem 0; background: #fff; color: #000; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 0 1rem; }
+  p { max-width: 48rem; line-height: 1.6; margin-bottom: 1.25rem; }
+  h1 { font-size: 1.5rem; font-weight: 700; }
+  hr { border: none; border-top: 2px solid #000; margin: 1rem 0; }
+  .nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.5rem; }
+  .nav .links { margin: 0; }
+  #result { margin-top: 1.5rem; word-break: break-all; }
+  #result span { background: #f0f0f0; padding: 0.25rem 0.5rem; font-size: 0.85rem; }
+  .hidden { display: none; }
+  button:hover { background: var(--menta); color: #000; }
+  .footer { margin-top: 2rem; color: #999; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+
+{% include 'nav.html' %}
+<div class="container">
+
+<h1>Menta — Demo</h1>
+<hr>
+
+<p>Solve the challenge. This demo runs locally; the SaaS version is tied to your domain, protected against abuse, and starts with a 45-day free trial.</p>
+<menta-widget data-cap-api-endpoint="" data-cap-i18n-initial-state="I'm not a robot" data-cap-privacy-url="/privacy" data-cap-terms-url="/terms" aria-label="Menta challenge"></menta-widget>
+
+<p style="font-size:0.85rem; color:#555;">Menta does not use cookies, fingerprints or third-party telemetry. Your users click once; the proof-of-work runs silently. Support is anonymous and activation is verified manually with crypto for your privacy.</p>
+
+{% include 'footer.html' %}
+</div>
+
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy-First Captcha and Bot Protection: Menta</title>
+<link rel="icon" type="image/svg+xml" href="/menta-logo.svg">
+<style>
+  :root { --menta: #22C55E; }
+  body { font-family: "Courier New", monospace; margin: 0; padding: 2rem 0; background: #fff; color: #000; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 0 1rem; }
+  h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
+  hr { border: none; border-top: 2px solid #000; margin: 1rem 0; }
+  p { max-width: 48rem; line-height: 1.6; margin-bottom: 1.25rem; }
+  .nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.5rem; }
+  .nav .links { margin: 0; }
+  ul { list-style: none; padding: 0; margin-bottom: 1rem; }
+  li { margin-bottom: 0.75rem; line-height: 1.5; }
+  .tag { display: inline-block; width: 4rem; font-weight: 700; }
+  .post { color: #000; }
+  .path { font-family: "Courier New", monospace; }
+  .desc { color: #555; }
+  a { color: #000; }
+  a:hover { background: #000; color: #fff; }
+  pre { background: #f0f0f0; padding: 1rem; overflow-x: auto; font-family: "Courier New", monospace; margin: 1rem 0; }
+  h2 { font-size: 2rem; font-weight: 700; letter-spacing: -0.05em; margin-top: 2.5rem; margin-bottom: 1rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+  .badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid #000;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+  }
+  .cta {
+    display: inline-block;
+    background: var(--menta);
+    color: #000;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--menta);
+    text-decoration: none;
+  }
+  .cta:hover { filter: brightness(0.95); }
+  button:hover { background: var(--menta); color: #000; }
+  .hero { display: flex; align-items: center; gap: 1.5rem; margin: 1rem 0; }
+  .hero-text { flex: 1; }
+  .hero-media { flex: 1; }
+  .hero-media img { max-width: 100%; height: auto; display: block; }
+  @media (max-width: 768px) { .hero { flex-direction: column; } }
+  .footer { margin-top: 2rem; color: #999; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+{% include 'nav.html' %}
+<div class="container">
+
+<div class="hero">
+  <div class="hero-text">
+    <p><strong>Self-hosted CAPTCHA for the modern web.</strong> No Google. No telemetry. No visual puzzles.</p>
+    <p>Menta replaces image-based challenges with a lightweight proof-of-work check. Users click once; your server verifies the rest. Try our hosted SaaS free for 45 days, or run it yourself at zero cost.</p>
+  </div>
+  <div class="hero-media">
+    <img src="/menta-in-action.gif" alt="Menta in action" width="400">
+  </div>
+</div>
+
+<h2>What is Menta?</h2>
+<p>Menta is a privacy-first, self-hosted CAPTCHA that runs entirely on your own infrastructure. It uses a hashcash-style proof-of-work challenge to tell humans and bots apart — no third-party scripts, no cookies, no fingerprinting, and no pictures to identify.</p>
+<p>Built for developers who want simple bot protection without shipping their users' traffic to a closed service.</p>
+<p><span class="badge">[ FREE ]</span> <strong>Self-hosted is 100% free</strong> — no hidden fees, no limits, no strings attached. <a href="/pricing">SaaS plans</a> start at $1/month and include a 45-day free trial, manual crypto activation, and a domain-protection system that keeps every account tied to its real owner.</p>
+
+<h2>Why does it exist?</h2>
+<p>Menta was born from the need to protect forms and APIs from bots without surrendering visitor data to a third party. Most CAPTCHA services force users to identify traffic lights, train machine-learning models, or hand over fingerprints to a cloud vendor. Menta is a small, open-source, self-hosted alternative: you run it on your own server, your backend verifies the token, and your users' data stays between you and them.</p>
+
+<h2>How it works</h2>
+<p>Menta runs 8 main validation checks across the <code>/init</code>, <code>/challenge</code> and <code>/redeem</code> endpoints:</p>
+<ol>
+  <li><strong>Rate limit per IP and endpoint.</strong> Prevents brute-force requests from a single address.</li>
+  <li><strong>Bot signal checks.</strong> Flags traffic patterns that look automated.</li>
+  <li><strong>Session validity.</strong> Verifies the session exists, has not expired, has not been reused, and matches the original IP.</li>
+  <li><strong>Session signature.</strong> HMAC check proves the session was created by this server.</li>
+  <li><strong>Challenge signature.</strong> HMAC check proves the challenge was created by this server.</li>
+  <li><strong>Nonce entropy.</strong> Ensures the nonce is not a trivial or precomputed value.</li>
+  <li><strong>Proof-of-work.</strong> <code>SHA-256(salt + nonce)</code> must meet the current target difficulty.</li>
+  <li><strong>Client pattern.</strong> Solve time is analyzed against a normal human range to catch scripted shortcuts.</li>
+</ol>
+
+<h2>Why Menta?</h2>
+<ul>
+  <li><strong>Zero third-party telemetry.</strong> No requests to Google, Cloudflare or hCaptcha. Visitor data stays on your server.</li>
+  <li><strong>Private by design.</strong> No email, no cookies, no fingerprints. Support is anonymous and ntfy notifications are optional.</li>
+  <li><strong>No visual puzzles.</strong> Proof-of-work runs silently. Users click once and continue.</li>
+  <li><strong>Lightweight & dependency-free.</strong> One small JavaScript file. No external libraries or iframes.</li>
+  <li><strong>Self-hosted & free at scale.</strong> No quotas, no per-request fees, no vendor lock-in.</li>
+  <li><strong>Adaptive difficulty.</strong> Adjusts the target based on recent failures and solve patterns.</li>
+  <li><strong>Domain-protected accounts.</strong> Every SaaS account is tied to its domain, preventing abuse and keeping the system fair for everyone.</li>
+  <li><strong>Anonymous support.</strong> Open a ticket with a secret link; no account or personal data required.</li>
+  <li><strong>Admin dashboard.</strong> Track solves, failures, bot-flagged IPs and active sessions.</li>
+  <li><strong>Subject rights.</strong> Export and delete endpoints for data subject requests.</li>
+</ul>
+
+<h2>Why Menta is different</h2>
+<p>Menta is not a clone of reCAPTCHA or the big alternatives. It is a small, solo project built with one goal in mind: giving you full control over how your users are protected. I created Menta because I wanted to know exactly what happens to visitor data — no third-party scripts, no fingerprints, no black boxes, no surprises.</p>
+<p>If Menta makes sense for you, you can use it for free by self-hosting, or support the project through the SaaS mode. The SaaS price is symbolic: it helps keep Menta free, open-source and accessible to more developers who care about privacy as much as you do.</p>
+
+<h2>Privacy &amp; compliance</h2>
+<p>Menta is built with privacy-by-design principles, not as a legal certification. The technical foundation supports strong data protection, but formal compliance depends on your deployment, jurisdiction and legal process.</p>
+<ul>
+  <li><strong>Data minimization.</strong> IPs are truncated to /24 (IPv4) or /64 (IPv6) by default. No cookies, no fingerprinting, no third-party telemetry.</li>
+  <li><strong>Retention and cleanup.</strong> Configurable data-retention window with automatic cleanup of rate limits, solved challenges, failed attempts and support tickets.</li>
+  <li><strong>Subject rights.</strong> Export and delete endpoints for data subject requests.</li>
+  <li><strong>Encryption at rest.</strong> Optional SQLCipher encryption when <code>DB_ENCRYPTION_KEY</code> is set.</li>
+  <li><strong>Accessibility.</strong> ARIA labels, keyboard support, live regions and focus management as a baseline.</li>
+  <li><strong>Internationalization.</strong> Widget text is fully configurable, so integrators can provide their own translations.</li>
+</ul>
+<p>Our <a href="/privacy">Privacy</a>, <a href="/terms">Terms</a>, <a href="/dpa">DPA</a> and <a href="/baa">BAA</a> pages are standard templates. They are not a signed legal agreement or formal certification for GDPR, CCPA, LGPD, PIPEDA, DPDPA, HIPAA or PIPL. If your use case requires a specific compliance claim, review the documents with your legal counsel.</p>
+
+<h2>Get started</h2>
+<p>You have two ways to use Menta:</p>
+
+<h3>Option 1: Use the hosted widget (SaaS)</h3>
+<p>Add the script and the <code>&lt;menta-widget&gt;</code> tag to your page. Every new SaaS account gets a 45-day free trial; after that, activate with a simple manual crypto verification.</p>
+<pre><code>&lt;script src="https://mentacaptchaeu.eu.pythonanywhere.com/menta-captcha.js"&gt;&lt;/script&gt;
+
+&lt;menta-widget data-cap-api-endpoint="https://mentacaptchaeu.eu.pythonanywhere.com" data-cap-i18n-initial-state="I'm not a robot"&gt;&lt;/menta-widget&gt;</code></pre>
+<p><a class="cta" href="/pricing">See SaaS pricing</a> &middot; <a href="/support">Get help</a></p>
+
+<h3>Option 2: Self-host</h3>
+<p>Deploy the backend on any server that supports Python, such as <a href="https://www.pythonanywhere.com/">PythonAnywhere</a> or your own VPS. Self-hosted Menta is completely free — no hidden fees, no feature limits, no telemetry.</p>
+
+<style>
+  .get { color: #000; }
+</style>
+
+{% include 'footer.html' %}
+</div>
+</body>
+</html>

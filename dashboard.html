@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="admin-token-required" content="{{ admin_token_required|lower }}">
+<title>Menta — Dashboard</title>
+<link rel="icon" type="image/svg+xml" href="/menta-logo.svg">
+<style>
+  :root { --menta: #22C55E; }
+  body { font-family: "Courier New", monospace; margin: 0; padding: 2rem 0; background: #fff; color: #000; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 0 1rem; }
+  h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+  hr { border: none; border-top: 2px solid #000; margin: 1rem 0; }
+  a { color: #000; }
+  a:hover { background: #000; color: #fff; }
+  .nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.5rem; }
+  .nav .links { margin: 0; }
+  .form { margin: 1.5rem 0; max-width: 800px; }
+  input[type="password"] {
+    font-family: "Courier New", monospace;
+    padding: 0.5rem;
+    border: 1px solid #000;
+    width: 300px;
+    max-width: 100%;
+  }
+  button {
+    font-family: "Courier New", monospace;
+    padding: 0.5rem 1rem;
+    border: 1px solid #000;
+    background: #000;
+    color: #fff;
+    cursor: pointer;
+  }
+  button:hover { background: var(--menta); color: #000; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .card {
+    border: 1px solid #000;
+    padding: 1rem;
+    min-height: 100px;
+  }
+  .card .label { font-size: 0.8rem; color: #555; text-transform: uppercase; }
+  .card .value { font-size: 2rem; font-weight: 700; margin-top: 0.5rem; }
+  .error { color: #c00; margin-top: 1rem; }
+  h2 { margin-top: 2.5rem; margin-bottom: 1rem; }
+  h3 { margin-top: 1.5rem; margin-bottom: 0.75rem; }
+  .footer { margin-top: 2rem; color: #999; font-size: 0.8rem; }
+  .success { color: #070; margin-top: 1rem; }
+  .warning { color: #c70; margin-top: 1rem; }
+  input[type="text"], textarea {
+    font-family: "Courier New", monospace;
+    padding: 0.5rem;
+    border: 1px solid #000;
+    width: 300px;
+    max-width: 100%;
+  }
+  textarea { height: 5rem; }
+  .account-number {
+    font-size: 1.2rem;
+    font-weight: 700;
+    background: #f0f0f0;
+    padding: 0.5rem;
+    display: inline-block;
+    margin: 0.5rem 0;
+  }
+  .banner {
+    border: 1px solid #000;
+    padding: 1rem;
+    margin: 1rem 0;
+    background: #f9f9f9;
+  }
+  .banner.trial { border-left: 4px solid #070; }
+  .banner.expired { border-left: 4px solid #c00; }
+  .banner.pending { border-left: 4px solid #c70; }
+  select {
+    font-family: "Courier New", monospace;
+    padding: 0.5rem;
+    border: 1px solid #000;
+    width: 300px;
+    max-width: 100%;
+  }
+</style>
+</head>
+<body>
+
+{% include 'nav.html' %}
+<div class="container">
+
+<div id="admin-login-form" class="form" role="form" aria-label="Admin dashboard">
+  <label for="token">Admin token:</label><br>
+  <input type="password" id="token" placeholder="Bearer token" aria-describedby="error"><br>
+  <label for="admin-totp">Admin TOTP code / recovery code:</label><br>
+  <input type="text" id="admin-totp" placeholder="000000" style="width: 220px;" aria-describedby="error"><br>
+  <label style="display:block;margin:0.5rem 0;">
+    <input type="checkbox" id="remember-token" style="width:auto;"> Remember me for 30 days
+  </label>
+  <button id="load" type="button">Load metrics</button>
+</div>
+
+<div id="admin-2fa-setup" style="display:none;">
+  <h2>Admin 2FA setup required</h2>
+  <p>Scan the QR code with your authenticator app, then enter the 6-digit code to finish setup.</p>
+  <div id="admin-2fa-qr" style="margin: 1rem 0;"></div>
+  <label for="admin-2fa-code">Verification code:</label><br>
+  <input type="text" id="admin-2fa-code" placeholder="000000" style="width: 220px;"><br>
+  <button id="verify-admin-2fa" type="button">Verify and enable 2FA</button>
+  <div id="admin-2fa-result" class="success" style="display:none;" role="status" aria-live="polite"></div>
+</div>
+
+<div id="error" class="error" style="display:none;" role="status" aria-live="polite"></div>
+
+<div class="grid" id="metrics" style="display:none;">
+  <div class="card">
+    <div class="label">Bot IPs (1h)</div>
+    <div class="value" id="bot_ips_1h">0</div>
+  </div>
+  <div class="card">
+    <div class="label">Failures (1h)</div>
+    <div class="value" id="total_failures_1h">0</div>
+  </div>
+  <div class="card">
+    <div class="label">Solved (1h)</div>
+    <div class="value" id="solves_1h">0</div>
+  </div>
+  <div class="card">
+    <div class="label">Active sessions</div>
+    <div class="value" id="sessions_active">0</div>
+  </div>
+  <div class="card">
+    <div class="label">DB size</div>
+    <div class="value" id="db_size">0</div>
+  </div>
+</div>
+
+<div id="admin-section" style="display:none;">
+<h2>Administration</h2>
+<p>Manage accounts, activate paid subscriptions and respond to anonymous support tickets from one place. Domain protection prevents duplicate accounts and keeps the service fair.</p>
+
+<h3>Accounts</h3>
+<p>Manage customer accounts, activate subscriptions, and remove accounts.</p>
+<div id="accounts-list" style="margin: 1rem 0;"></div>
+
+<h3>Support tickets</h3>
+<p>View and respond to anonymous support tickets from users.</p>
+<div id="tickets-list" style="margin: 1rem 0;"></div>
+
+<h2>Data subject requests</h2>
+<p>Export or delete personal data associated with an IP address or prefix.</p>
+<div class="form">
+  <label for="ip">Identifier (IP prefix or full IP):</label><br>
+  <input type="text" id="ip" placeholder="e.g. 203.0.113.0/24" aria-describedby="data-error">
+  <button id="export" type="button">Export data</button>
+  <button id="delete" type="button" style="background:#fff;color:#000;">Delete data</button>
+</div>
+<div id="data-error" class="error" style="display:none;" role="status" aria-live="polite"></div>
+<pre id="data-output" style="display:none;background:#f0f0f0;padding:1rem;overflow-x:auto;max-height:20rem;"></pre>
+</div>
+
+{% include 'footer.html' %}
+
+<script>
+  const tokenEl = document.getElementById('token');
+  const totpEl = document.getElementById('admin-totp');
+  const rememberEl = document.getElementById('remember-token');
+  const TOKEN_STORAGE_KEY = 'menta_admin_token';
+  const TOKEN_EXPIRY_KEY = 'menta_admin_token_expires';
+
+  function loadRememberedToken() {
+    try {
+      const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+      const expires = parseInt(localStorage.getItem(TOKEN_EXPIRY_KEY) || '0', 10);
+      if (token && Date.now() < expires) {
+        tokenEl.value = token;
+        rememberEl.checked = true;
+        return true;
+      } else {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        localStorage.removeItem(TOKEN_EXPIRY_KEY);
+        rememberEl.checked = false;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  function saveRememberedToken() {
+    try {
+      if (rememberEl.checked && tokenEl.value) {
+        localStorage.setItem(TOKEN_STORAGE_KEY, tokenEl.value);
+        localStorage.setItem(TOKEN_EXPIRY_KEY, String(Date.now() + (30 * 24 * 60 * 60 * 1000)));
+      } else {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        localStorage.removeItem(TOKEN_EXPIRY_KEY);
+      }
+    } catch (e) {}
+  }
+
+  function clearRememberedToken() {
+    try {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      localStorage.removeItem(TOKEN_EXPIRY_KEY);
+    } catch (e) {}
+  }
+
+  function adminHeaders(contentType) {
+    const token = tokenEl.value.trim();
+    const totp = totpEl.value.trim();
+    const headers = { 'Authorization': 'Bearer ' + token };
+    if (contentType) headers['Content-Type'] = 'application/json';
+    if (totp) {
+      if (totp.length === 6) headers['X-Admin-TOTP'] = totp;
+      else headers['X-Admin-Recovery-Code'] = totp;
+    }
+    if (rememberEl.checked) {
+      headers['X-Remember-Me'] = 'true';
+    } else {
+      headers['X-Remember-Me'] = 'false';
+    }
+    return headers;
+  }
+
+  function handleAdminError(r, data) {
+    if (r.status === 403 && data && data.setup_required) {
+      showAdmin2FASetup();
+      throw new Error('Admin 2FA setup required');
+    }
+    throw new Error(data.error || 'Error ' + r.status);
+  }
+
+  async function loadMetrics(silent = false) {
+    const errorEl = document.getElementById('error');
+    const metricsEl = document.getElementById('metrics');
+    const adminEl = document.getElementById('admin-section');
+    if (!silent) errorEl.style.display = 'none';
+    try {
+      const r = await fetch('/admin/metrics', { headers: adminHeaders() });
+      const data = await r.json();
+      if (!r.ok) handleAdminError(r, data);
+      for (const key of ['bot_ips_1h', 'total_failures_1h', 'solves_1h', 'sessions_active']) {
+        document.getElementById(key).textContent = data[key] ?? 0;
+      }
+      const bytes = data.db_size || 0;
+      document.getElementById('db_size').textContent = bytes < 1024 ? bytes + ' B' : (bytes / 1024).toFixed(1) + ' KB';
+      metricsEl.style.display = 'grid';
+      adminEl.style.display = 'block';
+      document.getElementById('admin-login-form').style.display = 'none';
+      return true;
+    } catch (e) {
+      metricsEl.style.display = 'none';
+      adminEl.style.display = 'none';
+      if (!silent) {
+        errorEl.textContent = e.message;
+        errorEl.style.display = 'block';
+      }
+      return false;
+    }
+  }
+
+  async function loadData(action) {
+    const ip = document.getElementById('ip').value;
+    const errEl = document.getElementById('data-error');
+    const outEl = document.getElementById('data-output');
+    errEl.style.display = 'none';
+    outEl.style.display = 'none';
+    try {
+      const r = await fetch('/admin/' + action, {
+        method: 'POST',
+        headers: adminHeaders(true),
+        body: JSON.stringify({ ip })
+      });
+      const data = await r.json();
+      if (!r.ok) handleAdminError(r, data);
+      outEl.textContent = JSON.stringify(data, null, 2);
+      outEl.style.display = 'block';
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+    }
+  }
+
+  let admin2faSecret = '';
+
+  async function showAdmin2FASetup() {
+    document.getElementById('admin-2fa-setup').style.display = 'block';
+    document.getElementById('metrics').style.display = 'none';
+    document.getElementById('admin-section').style.display = 'none';
+    try {
+      const r = await fetch('/admin/2fa/setup', { method: 'POST', headers: adminHeaders(true) });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
+      admin2faSecret = data.secret;
+      document.getElementById('admin-2fa-qr').innerHTML = '<img src="data:image/svg+xml;base64,' + data.qr + '" alt="QR" style="max-width:240px;border:1px solid #000;"><br><code>' + data.uri + '</code>';
+    } catch (e) {
+      document.getElementById('error').textContent = e.message;
+      document.getElementById('error').style.display = 'block';
+    }
+  }
+
+  async function verifyAdmin2FA() {
+    const code = document.getElementById('admin-2fa-code').value.trim();
+    const resultEl = document.getElementById('admin-2fa-result');
+    resultEl.style.display = 'none';
+    try {
+      const r = await fetch('/admin/2fa/verify', {
+        method: 'POST',
+        headers: adminHeaders(true),
+        body: JSON.stringify({ secret: admin2faSecret, code })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
+      resultEl.innerHTML = '<strong>2FA enabled.</strong> Save these recovery codes, they will not be shown again:<br><code>' + (data.recovery_codes || []).join('</code> <code>') + '</code>';
+      resultEl.style.display = 'block';
+      document.getElementById('admin-2fa-setup').style.display = 'none';
+      if (await loadMetrics()) { loadAccounts(); loadTickets(); }
+    } catch (e) {
+      resultEl.textContent = e.message;
+      resultEl.className = 'error';
+      resultEl.style.display = 'block';
+    }
+  }
+
+  async function loadAccounts() {
+    const el = document.getElementById('accounts-list');
+    el.innerHTML = '';
+    try {
+      const r = await fetch('/admin/accounts', { headers: adminHeaders() });
+      const data = await r.json();
+      if (!r.ok) handleAdminError(r, data);
+      if (!data.accounts.length) {
+        el.textContent = 'No accounts yet.';
+        return;
+      }
+      const table = document.createElement('table');
+      table.style.borderCollapse = 'collapse';
+      table.innerHTML = '<tr><th style="text-align:left;padding:0.5rem;border:1px solid #000;">Account</th><th style="text-align:left;padding:0.5rem;border:1px solid #000;">Domain</th><th style="text-align:left;padding:0.5rem;border:1px solid #000;">Plan</th><th style="text-align:left;padding:0.5rem;border:1px solid #000;">Status</th><th style="text-align:left;padding:0.5rem;border:1px solid #000;">Trial left</th><th style="text-align:left;padding:0.5rem;border:1px solid #000;">Action</th></tr>';
+      for (const a of data.accounts) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td style="padding:0.5rem;border:1px solid #000;">' + a.account_number + '</td>' +
+          '<td style="padding:0.5rem;border:1px solid #000;">' + a.primary_domain + '</td>' +
+          '<td style="padding:0.5rem;border:1px solid #000;">' + a.plan + '</td>' +
+          '<td style="padding:0.5rem;border:1px solid #000;">' + a.status + '</td>' +
+          '<td style="padding:0.5rem;border:1px solid #000;">' + (a.trial_days_left != null ? a.trial_days_left + 'd' : '-') + '</td>' +
+          '<td style="padding:0.5rem;border:1px solid #000;"><button class="activate" data-acc="' + a.account_number + '" data-plan="' + a.plan + '">Activate</button> ' +
+          '<button class="delete-account" data-acc="' + a.account_number + '" style="background:#fff;color:#000;">Delete</button></td>';
+        table.appendChild(tr);
+      }
+      el.appendChild(table);
+      for (const btn of el.querySelectorAll('.activate')) {
+        btn.addEventListener('click', (e) => activateAccount(e.target.dataset.acc, e.target.dataset.plan));
+      }
+      for (const btn of el.querySelectorAll('.delete-account')) {
+        btn.addEventListener('click', (e) => deleteAccount(e.target.dataset.acc));
+      }
+    } catch (e) {
+      el.textContent = 'Unable to load accounts: ' + e.message;
+    }
+  }
+
+  async function activateAccount(accountNumber, plan) {
+    if (!accountNumber) return;
+    try {
+      const r = await fetch('/admin/account/activate', {
+        method: 'POST',
+        headers: adminHeaders(true),
+        body: JSON.stringify({ account_number: accountNumber, plan: plan })
+      });
+      const data = await r.json();
+      if (!r.ok) handleAdminError(r, data);
+      alert('Account activated: ' + accountNumber);
+      loadAccounts();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  async function deleteAccount(accountNumber) {
+    if (!accountNumber) return;
+    if (!confirm('Delete account ' + accountNumber + ' and all its data? This cannot be undone.')) return;
+    try {
+      const r = await fetch('/admin/account/' + encodeURIComponent(accountNumber) + '/delete', {
+        method: 'POST',
+        headers: adminHeaders()
+      });
+      const data = await r.json();
+      if (!r.ok) handleAdminError(r, data);
+      alert('Account deleted: ' + accountNumber);
+      loadAccounts();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  async function loadTickets() {
+    const el = document.getElementById('tickets-list');
+    el.innerHTML = '';
+    try {
+      const r = await fetch('/admin/support/tickets', { headers: adminHeaders() });
+      const data = await r.json();
+      if (!r.ok) handleAdminError(r, data);
+      if (!data.tickets.length) {
+        el.textContent = 'No support tickets.';
+        return;
+      }
+      const ul = document.createElement('ul');
+      const adminToken = tokenEl.value.trim();
+      const tokenQuery = adminToken ? '?token=' + encodeURIComponent(adminToken) : '';
+      for (const t of data.tickets) {
+        const li = document.createElement('li');
+        li.innerHTML = '<a href="/support/' + encodeURIComponent(t.id) + tokenQuery + '" target="_blank">' + t.subject + '</a> (' + t.status + ') — ' + new Date(t.created_at * 1000).toLocaleString() +
+          ' <button type="button" class="close-ticket" data-id="' + t.id + '">Close</button>' +
+          ' <button type="button" class="delete-ticket" data-id="' + t.id + '" style="background:#fff;color:#000;">Delete</button>';
+        ul.appendChild(li);
+      }
+      el.appendChild(ul);
+      for (const btn of el.querySelectorAll('.close-ticket')) {
+        btn.addEventListener('click', (e) => closeTicket(e.target.dataset.id));
+      }
+      for (const btn of el.querySelectorAll('.delete-ticket')) {
+        btn.addEventListener('click', (e) => deleteTicket(e.target.dataset.id));
+      }
+    } catch (e) {
+      el.textContent = 'Unable to load tickets: ' + e.message;
+    }
+  }
+
+  async function closeTicket(ticketId) {
+    if (!ticketId) return;
+    try {
+      const r = await fetch('/admin/support/ticket/' + encodeURIComponent(ticketId) + '/close', {
+        method: 'POST',
+        headers: adminHeaders()
+      });
+      const data = await r.json();
+      if (!r.ok) handleAdminError(r, data);
+      loadTickets();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  async function deleteTicket(ticketId) {
+    if (!ticketId) return;
+    if (!confirm('Delete this ticket and all its replies?')) return;
+    try {
+      const r = await fetch('/admin/support/ticket/' + encodeURIComponent(ticketId) + '/delete', {
+        method: 'POST',
+        headers: adminHeaders()
+      });
+      const data = await r.json();
+      if (!r.ok) handleAdminError(r, data);
+      loadTickets();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  document.getElementById('token').addEventListener('keydown', async (e) => { if (e.key === 'Enter') { saveRememberedToken(); if (await loadMetrics()) { loadAccounts(); loadTickets(); } } });
+  document.getElementById('load').addEventListener('click', async () => { saveRememberedToken(); if (await loadMetrics()) { loadAccounts(); loadTickets(); } });
+  document.getElementById('verify-admin-2fa').addEventListener('click', verifyAdmin2FA);
+  document.getElementById('remember-token').addEventListener('change', () => { if (!rememberEl.checked) clearRememberedToken(); });
+  loadRememberedToken();
+  loadMetrics(true).then(success => { if (success) { loadAccounts(); loadTickets(); } });
+</script>
+
+</div>
+</body>
+</html>
