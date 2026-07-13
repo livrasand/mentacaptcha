@@ -1900,6 +1900,11 @@ def update_account_domains():
             return jsonify({"error": "Domain conflict with another account", "domain": host}), 409
     with get_db() as conn:
         conn.execute("UPDATE accounts SET domains = ? WHERE account_number = ?", (domains, account_number))
+    # Register each domain in domain_history so get_account_by_origin can resolve the tenant
+    for d in domains.split(','):
+        host = normalize_domain(d)
+        if host:
+            _register_domain_for_account(account_number, host, paid=(plan != 'beginner'), status='active')
     update_account_last_seen(account_number)
     return jsonify({"success": True, "domains": domains})
 
