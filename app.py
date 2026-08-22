@@ -3,17 +3,21 @@ import hashlib
 import hmac
 import ipaddress
 import io
-import json
+import bot_shield
 import jwt
 import os
-import re
+
 import secrets
 import sqlite3
 import time
 import urllib.parse
 import urllib.request
 import urllib.error
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv():
+        pass
 
 load_dotenv()
 
@@ -112,6 +116,13 @@ RL_GLOBAL_VERIFY = os.environ.get('RL_GLOBAL_VERIFY', '2000,3600')
 
 MIN_DIFFICULTY = os.environ.get('MIN_DIFFICULTY', '')
 DIFFICULTY_NEW_IP = os.environ.get('DIFFICULTY_NEW_IP', '')
+MAX_DIFFICULTY = os.environ.get('MAX_DIFFICULTY', '00000000')
+# Tenant global para el widget de protección universal (sin registro de dominio).
+SHIELD_TENANT = '__shield__'
+# Validez del clearance token emitido por /shield/redeem (segundos).
+SHIELD_CLEARANCE_TTL = int(os.environ.get('SHIELD_CLEARANCE_TTL', '86400'))
+# Dificultad del PoW invisible del shield (4 ceros ≈ ~70k hashes ≈ <2s en JS).
+SHIELD_DIFFICULTY = os.environ.get('SHIELD_DIFFICULTY', '0000')
 
 TRIAL_DAYS = int(os.environ.get('TRIAL_DAYS', 45))
 DOMAIN_COOLDOWN_DAYS = int(os.environ.get('DOMAIN_COOLDOWN_DAYS', 182))
@@ -1049,6 +1060,15 @@ def check_client_pattern(ip, solve_time, nonce=None, tenant_id=''):
 @app.before_request
 def enforce_proxy_and_cors():
     """Rechaza peticiones con proxy mal configurado y origenes no autorizados."""
+    # El widget de protección universal (menta-shield.js) funciona en cualquier
+    # página sin registro previo: no aplicamos el check de origen.
+    if request.path.startswith('/shield/') or request.path == '/menta-shield.js':
+        if request.method == 'OPTIONS':
+            return None
+        if check_proxy_misconfiguration() and PROXY_FAIL_CLOSED:
+            return jsonify({"success": False, "error": "Proxy misconfiguration. TRUSTED_PROXIES must be set."}), 400
+        return None
+
     if request.method == 'OPTIONS':
         origin = request.headers.get('Origin')
         tenant = current_tenant()
@@ -1079,6 +1099,13 @@ def enforce_proxy_and_cors():
 def cors(response):
     origin = request.headers.get('Origin')
     tenant = current_tenant()
+    # El shield universal refleja cualquier origen: se usa en páginas no registradas.
+    if request.path.startswith('/shield/'):
+        if origin:
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+            response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        return response
     if origin and is_origin_allowed(tenant, origin):
         response.headers['Access-Control-Allow-Origin'] = origin
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-API-Key, Authorization'
@@ -1298,6 +1325,15 @@ def pricing():
 
 @app.route('/demo')
 def demo():
+    # Aplicamos la lógica de bot_shield antes de servir la página de demo.
+    ua = request.headers.get('User-Agent', '')
+    ip = get_client_ip()
+    decision = bot_shield.evaluate_request(ua, ip, request.path)
+    if decision['action'] == 'block':
+        # Bloqueamos a bots que explícitamente violen robots.txt y estén verificados.
+        return jsonify({"error": "Access denied"}), 403
+    # Para 'shield' o 'allow' devolvemos la página normalmente; el middleware
+    # antes de la petición ya manejará la capa invisible si corresponde.
     return render_template('demo.html')
 
 @app.route('/menta-logo.svg')
@@ -1317,6 +1353,13 @@ def init_session():
     ip = get_client_ip()
     tenant_id = current_tenant()
     origin = request.headers.get('Origin')
+
+    # bot_shield: los bots conocidos que violan robots.txt y están verificados
+    # se bloquean aquí; el resto del veredicto se aplica en /challenge.
+    shield_verdict = bot_shield.evaluate_request(request.headers.get('User-Agent', ''), ip, request.path)
+    if shield_verdict['action'] == 'block':
+        log_failure(ip, '/init', 'bot_shield_' + shield_verdict['reason'], tenant_id=tenant_id)
+        return jsonify({"success": False, "error": "Suspicious activity detected."}), 403
 
     status = check_account_status(tenant_id)
     if not status['ok']:
@@ -1386,6 +1429,21 @@ def get_challenge():
         log_failure(ip, '/challenge', 'bot_detected_' + reason, tenant_id=tenant_id)
         return jsonify({"success": False, "error": "Suspicious activity detected."}), 403
 
+    # bot_shield: bloqueamos bots verificados que desobedecen robots.txt y
+    # marcamos clientes sospechosos (impersonadores, scripts genéricos) para
+    # recibir el reto PoW a dificultad máxima.
+    shield_verdict = bot_shield.evaluate_request(request.headers.get('User-Agent', ''), ip, request.path)
+    if shield_verdict['action'] == 'block':
+        log_failure(ip, '/challenge', 'bot_shield_' + shield_verdict['reason'], tenant_id=tenant_id)
+        return jsonify({"success": False, "error": "Suspicious activity detected."}), 403
+    # Solo forzamos PoW máximo para sospechosos confirmados por el shield
+    # (impersonadores de bots, scripts genéricos). Un navegador normal también
+    # recibe 'shield' como 'unverified_client', pero sin hint de dificultad.
+    shielded = (shield_verdict['action'] == 'shield'
+                and shield_verdict.get('difficulty_hint') == 'max')
+    if shielded:
+        log_failure(ip, '/challenge', 'bot_shield_' + shield_verdict['reason'], tenant_id=tenant_id)
+
     data = request.json or {}
     session_id = data.get('session_id')
     session_sig = data.get('session_signature')
@@ -1422,6 +1480,9 @@ def get_challenge():
     challenge_id = secrets.token_hex(16)
     salt = secrets.token_hex(8)
     target = get_difficulty(ip, tenant_id=tenant_id)
+    if shielded:
+        # Los clientes marcados por bot_shield siempre reciben el PoW más duro.
+        target = _max_difficulty(target, MAX_DIFFICULTY)
     ch_expires = time.time() + 300
 
     with get_db() as conn:
@@ -1551,6 +1612,133 @@ def redeem():
 
     log_failure(ip, '/redeem', 'bad_pow', challenge_id, tenant_id=tenant_id)
     return jsonify({"success": False, "error": "Incorrect solution"}), 403
+
+
+@app.route('/shield/check', methods=['POST'])
+def shield_check():
+    """Widget de protección universal (menta-shield.js): evalúa la petición con
+    bot_shield sin requerir registro de dominio ni el widget de captcha.
+    - block  -> 403 (bot verificado que desobedece robots.txt)
+    - shield -> reto PoW invisible a dificultad máxima
+    - allow  -> paso directo
+    """
+    ip = get_client_ip()
+    ua = request.headers.get('User-Agent', '')
+    data = request.get_json(silent=True) or {}
+    path = data.get('path') or request.path
+
+    if not check_rate_limit(ip, '/shield/check', 10, 60, tenant_id=SHIELD_TENANT):
+        log_failure(ip, '/shield/check', 'rate_limit', tenant_id=SHIELD_TENANT)
+        return jsonify({"success": False, "action": "block", "error": "Too many requests."}), 429
+
+    verdict = bot_shield.evaluate_request(ua, ip, path)
+    if verdict['action'] == 'block':
+        log_failure(ip, '/shield/check', 'bot_shield_' + verdict['reason'], tenant_id=SHIELD_TENANT)
+        return jsonify({"success": False, "action": "block"}), 403
+
+    if verdict['action'] == 'shield' and verdict.get('difficulty_hint') == 'max':
+        # Impersonador de bot o script genérico con JS: PoW invisible duro.
+        log_failure(ip, '/shield/check', 'bot_shield_' + verdict['reason'], tenant_id=SHIELD_TENANT)
+        challenge_id = secrets.token_hex(16)
+        salt = secrets.token_hex(8)
+        target = _max_difficulty(SHIELD_DIFFICULTY, MIN_DIFFICULTY)
+        ch_expires = time.time() + 120
+        with get_db() as conn:
+            conn.execute(
+                "INSERT INTO challenges (id, tenant_id, salt, target, created_at, expires) VALUES (?, ?, ?, ?, ?, ?)",
+                (challenge_id, SHIELD_TENANT, salt, target, time.time(), ch_expires)
+            )
+        return jsonify({
+            "success": True,
+            "action": "shield",
+            "token": challenge_id,
+            "challenge": {
+                "salt": salt,
+                "target": target,
+                "expires": ch_expires,
+                "challenge_signature": sign_challenge(challenge_id, salt, target, ch_expires)
+            }
+        })
+
+    return jsonify({"success": True, "action": "allow"})
+
+
+@app.route('/shield/redeem', methods=['POST'])
+def shield_redeem():
+    """Valida la solución del PoW invisible y emite un clearance token."""
+    ip = get_client_ip()
+
+    if not check_rate_limit(ip, '/shield/redeem', 10, 60, tenant_id=SHIELD_TENANT):
+        log_failure(ip, '/shield/redeem', 'rate_limit', tenant_id=SHIELD_TENANT)
+        return jsonify({"success": False, "error": "Too many requests."}), 429
+
+    data = request.get_json(silent=True) or {}
+    challenge_id = data.get('token')
+    nonce = str(data.get('solutions') or '')
+    ch_sig = data.get('challenge_signature')
+    if not challenge_id or not nonce or not ch_sig:
+        return jsonify({"success": False, "error": "Challenge data required."}), 403
+
+    with get_db() as conn:
+        row = conn.execute(
+            "DELETE FROM challenges WHERE id = ? AND tenant_id = ? RETURNING salt, target, created_at, expires",
+            (challenge_id, SHIELD_TENANT)
+        ).fetchone()
+    if not row or row["expires"] < time.time():
+        log_failure(ip, '/shield/redeem', 'challenge_not_found', challenge_id, tenant_id=SHIELD_TENANT)
+        return jsonify({"success": False, "error": "Challenge not found or expired."}), 400
+
+    expected_sig = sign_challenge(challenge_id, row['salt'], row['target'], row['expires'])
+    if not hmac.compare_digest(ch_sig, expected_sig):
+        log_failure(ip, '/shield/redeem', 'bad_challenge_signature', challenge_id, tenant_id=SHIELD_TENANT)
+        return jsonify({"success": False, "error": "Invalid challenge signature."}), 403
+
+    if time.time() - row["created_at"] < 0.2:
+        log_failure(ip, '/shield/redeem', 'too_fast', challenge_id, tenant_id=SHIELD_TENANT)
+        return jsonify({"success": False, "error": "Suspicious activity detected."}), 403
+
+    if hashlib.sha256((row['salt'] + nonce).encode()).hexdigest().startswith(row['target']):
+        now = int(time.time())
+        clearance = jwt.encode({
+            "sub": "shield-clearance",
+            "iat": now,
+            "exp": now + SHIELD_CLEARANCE_TTL,
+            "jti": secrets.token_hex(8),
+            "ip": ip
+        }, SECRET_KEY, algorithm="HS256")
+        return jsonify({"success": True, "clearance_token": clearance})
+
+    log_failure(ip, '/shield/redeem', 'bad_pow', challenge_id, tenant_id=SHIELD_TENANT)
+    return jsonify({"success": False, "error": "Incorrect solution."}), 403
+
+
+@app.route('/shield/verify', methods=['POST'])
+def shield_verify():
+    """Valida server-to-server un clearance del shield SIN consumirlo
+    (es reutilizable durante su TTL). Opcionalmente exige que la IP que
+    presenta el token coincida con la IP para la que fue emitido."""
+    data = request.get_json(silent=True) or {}
+    token = data.get('token')
+    if not token:
+        return jsonify({"success": False, "valid": False, "error": "token required"}), 400
+
+    if not check_rate_limit_global('/shield/verify', RL_GLOBAL_VERIFY):
+        return jsonify({"success": False, "valid": False, "error": "Too many requests."}), 429
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return jsonify({"success": True, "valid": False, "error": "expired"})
+    except Exception:
+        return jsonify({"success": True, "valid": False, "error": "invalid"})
+
+    if payload.get('sub') != 'shield-clearance':
+        return jsonify({"success": True, "valid": False, "error": "invalid"})
+
+    if data.get('check_ip') and payload.get('ip') != get_client_ip():
+        return jsonify({"success": True, "valid": False, "error": "ip_mismatch"})
+
+    return jsonify({"success": True, "valid": True})
 
 
 @app.route('/verify', methods=['POST'])
@@ -2312,6 +2500,10 @@ def admin_2fa_verify():
 def widget_js():
     return WIDGET_JS, 200, {'Content-Type': 'application/javascript'}
 
+@app.route('/menta-shield.js')
+def shield_js():
+    return SHIELD_JS, 200, {'Content-Type': 'application/javascript'}
+
 WIDGET_JS = r"""class CapWidget extends HTMLElement {
     constructor() {
         super();
@@ -2414,8 +2606,8 @@ WIDGET_JS = r"""class CapWidget extends HTMLElement {
 .container:focus-visible { outline: 2px solid #333; outline-offset: 2px; }
 .checkbox { width:24px; height:24px; border:2px solid #d1d1d1; border-radius:6px; margin-right:15px; display:flex; align-items:center; justify-content:center; }
 .label { font-size:16px; color:#333; flex-grow:1; }
-.brand { position:absolute; right:20px; bottom:24px; font-size:12px; color:#757575; text-decoration:underline; text-underline-offset:3px; }
-.logo { position:absolute; right:20px; bottom:42px; width:24px; height:24px; }
+.brand { position:absolute; right:20px; bottom:12px; font-size:12px; color:#757575; text-decoration:underline; text-underline-offset:3px; }
+.logo { position:absolute; right:20px; bottom:12px; width:24px; height:24px; }
 .spinner { display:none; width:18px; height:18px; border:2px solid #f3f3f3; border-top:2px solid #333; border-radius:50%; animation:spin 1s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 @keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
@@ -2433,9 +2625,6 @@ WIDGET_JS = r"""class CapWidget extends HTMLElement {
   <div class="checkbox" id="check" aria-hidden="true"><div class="spinner" id="spin"></div></div>
   <span class="label" id="label">${initialLabel}</span>
   <span class="brand">Menta<span class="mint-accent">.</span></span>
-  <div class="links" id="links">
-    ${privacyLink} &middot; ${termsLink}
-  </div>
 </div>
 <div class="message" id="message" style="display:none;"></div>`;
         const box = this.shadowRoot.getElementById('box');
@@ -2545,6 +2734,152 @@ WIDGET_JS = r"""class CapWidget extends HTMLElement {
     }
 }
 customElements.define('menta-widget', CapWidget);"""
+
+SHIELD_JS = r"""(function () {
+    'use strict';
+    // Menta Shield: protección universal contra bots basada en bot_shield.
+    // Uso: <script src="https://<host>/menta-shield.js" data-menta-api="https://<host>"></script>
+    // No requiere <menta-widget> ni registro de dominio.
+    var script = document.currentScript || (function () {
+        var all = document.getElementsByTagName('script');
+        return all[all.length - 1];
+    })();
+
+    function attr(name, fallback) {
+        var v = script ? script.getAttribute(name) : null;
+        return v !== null && v !== '' ? v : fallback;
+    }
+
+    var api = (attr('data-menta-api', '') || location.origin).replace(/\/+$/, '');
+    var TOKEN_KEY = 'menta_shield_clearance';
+    var TTL = parseInt(attr('data-menta-ttl', '86400'), 10) * 1000;
+    var hideUntilPass = attr('data-menta-hide-until-pass', 'false') !== 'false';
+    var blockMsg = attr('data-menta-i18n-blocked-title', 'Access denied');
+    var blockDetail = attr('data-menta-i18n-blocked-detail', 'Your request looks automated and has been blocked.');
+    var checkingMsg = attr('data-menta-i18n-checking', 'Checking your browser before you enter.');
+
+    window.MentaShield = { passed: false, token: null };
+
+    // --- Overlay / ocultado de contenido ---
+    var css = document.createElement('style');
+    css.textContent =
+        'html.menta-shield-pending .menta-shield-hide{filter:blur(6px);pointer-events:none;user-select:none}' +
+        '#menta-shield-overlay{position:fixed;inset:0;background:#fff;z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}' +
+        '.ms-card{text-align:center;padding:2rem 2.5rem;border-radius:12px;border:1px solid #e0e0e0;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.08);max-width:320px}' +
+        '.ms-spin{width:28px;height:28px;border:3px solid #f0f0f0;border-top-color:#2ECC71;border-radius:50%;margin:0 auto 1rem;animation:ms-spin 1s linear infinite}' +
+        '@keyframes ms-spin{to{transform:rotate(360deg)}}' +
+        '@media (prefers-reduced-motion:reduce){.ms-spin{animation:none}}' +
+        '.ms-title{font-size:15px;font-weight:600;color:#333;margin:0 0 .4rem}.ms-msg{font-size:12px;color:#757575;margin:0;line-height:1.5}';
+    document.head.appendChild(css);
+
+    if (hideUntilPass) document.documentElement.classList.add('menta-shield-pending');
+
+    function showOverlay(title, msg, spinner) {
+        var ov = document.getElementById('menta-shield-overlay') || document.createElement('div');
+        ov.id = 'menta-shield-overlay';
+        ov.innerHTML = '<div class="ms-card">' +
+            (spinner ? '<div class="ms-spin"></div>' : '') +
+            '<p class="ms-title"></p><p class="ms-msg"></p></div>';
+        ov.querySelector('.ms-title').textContent = title;
+        ov.querySelector('.ms-msg').textContent = msg;
+        if (!ov.parentNode) document.body.appendChild(ov);
+        return ov;
+    }
+
+    function removeOverlay() {
+        var ov = document.getElementById('menta-shield-overlay');
+        if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+        document.documentElement.classList.remove('menta-shield-pending');
+    }
+
+    function pass(token) {
+        window.MentaShield.passed = true;
+        window.MentaShield.token = token || null;
+        try {
+            localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: token, ts: Date.now() }));
+        } catch (e) { /* storage no disponible */ }
+        removeOverlay();
+        document.dispatchEvent(new CustomEvent('mentashield:pass', { detail: { token: token } }));
+    }
+
+    function block() {
+        showOverlay(blockMsg, blockDetail, false);
+        document.dispatchEvent(new CustomEvent('mentashield:block'));
+    }
+
+    // --- PoW ---
+    async function sha256(m) {
+        const b = new TextEncoder().encode(m);
+        const d = await crypto.subtle.digest('SHA-256', b);
+        return Array.from(new Uint8Array(d)).map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function solvePoW(challenge) {
+        let nonce = 0;
+        while (true) {
+            const h = await sha256(challenge.salt + nonce);
+            if (h.startsWith(challenge.target)) return nonce;
+            nonce++;
+        }
+    }
+
+    // --- Flujo principal ---
+    async function run() {
+        // Clearance reciente: evita re-verificar en cada página/navegación.
+        try {
+            var cached = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null');
+            if (cached && cached.token && Date.now() - cached.ts < TTL) {
+                pass(cached.token);
+                return;
+            }
+        } catch (e) { /* ignore */ }
+
+        var verdict;
+        try {
+            const r = await fetch(api + '/shield/check', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: location.pathname })
+            });
+            if (r.status === 403) { block(); return; }
+            if (!r.ok) throw new Error('check failed');
+            verdict = await r.json();
+        } catch (e) {
+            // Fail-open: si el shield no está disponible, no rompemos la página.
+            pass(null);
+            return;
+        }
+
+        if (verdict.action === 'shield' && verdict.challenge) {
+            showOverlay(checkingMsg.replace('.', '...'), '', true);
+            try {
+                const nonce = await solvePoW(verdict.challenge);
+                const v = await fetch(api + '/shield/redeem', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token: verdict.token,
+                        solutions: nonce,
+                        challenge_signature: verdict.challenge.challenge_signature
+                    })
+                });
+                const d = await v.json().catch(() => ({}));
+                if (!v.ok || !d.success) { block(); return; }
+                pass(d.clearance_token);
+            } catch (e) {
+                block();
+            }
+            return;
+        }
+        pass(null);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', run);
+    } else {
+        run();
+    }
+})();"""
 
 PRIVACY_HTML = """<!DOCTYPE html>
 <html lang="en">
