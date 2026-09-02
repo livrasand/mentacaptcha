@@ -1,0 +1,13 @@
+hr {
+	width: calc(100% - var(--padding-2x));
+	height: auto;
+
+	margin: var(--padding-0_5x) auto;
+	padding: 0;
+
+	border-bottom: 1px solid var(--color-background-shade);
+}
+
+html[theme='dark'] hr {
+	border-color: var(--color-background-tint);
+}

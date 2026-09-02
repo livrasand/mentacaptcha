@@ -1,0 +1,141 @@
+@use '../mixins/shadow';
+@use '../mixins/disabled';
+
+input,
+textarea,
+select {
+	@include shadow.card;
+
+	margin: var(--padding) 0 var(--padding-2x);
+	padding: var(--padding) var(--padding-2x);
+
+	width: 100%;
+	max-width: 100%;
+
+	outline: none;
+
+	transition: box-shadow 0.15s ease-out;
+
+	&:focus {
+		box-shadow: 2px 2px var(--color-secondary);
+	}
+}
+
+input,
+textarea,
+select {
+	&::placeholder {
+		color: var(--placeholder-color);
+		opacity: 1;
+	}
+}
+
+.options {
+	display: block;
+	margin: var(--padding) var(--padding-0_5x) 0;
+
+	input[type='checkbox'],
+	input[type='radio'] {
+		margin: 0;
+	}
+}
+
+.checkbox {
+	display: flex;
+	align-items: center;
+	gap: var(--padding-1_5x);
+
+	input[type='checkbox'],
+	input[type='radio'] {
+		margin: 0;
+	}
+
+	span {
+		white-space: pre-wrap;
+	}
+}
+
+.checkbox-group {
+	display: flex;
+	flex-direction: column;
+	row-gap: var(--padding);
+	padding: 0 0 var(--padding);
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+	accent-color: var(--color-primary);
+	width: fit-content;
+}
+
+input:not([type='checkbox']):not([type='radio']) {
+	-webkit-appearance: none;
+}
+
+input[type='checkbox'] {
+	border-color: var(--color-card-contrast);
+}
+
+input[type='radio'] {
+	box-shadow: none;
+	margin: var(--padding-1_5x) 0;
+}
+
+input:not([type='checkbox']):not([type='radio']),
+select {
+	height: 34px;
+
+	&[type='date'],
+	&.big {
+		height: 40px;
+	}
+}
+
+input[disabled] {
+	cursor: text;
+	@include disabled.disabled;
+
+	&::placeholder {
+		color: rgb(0, 0, 0, 0.2);
+	}
+}
+
+select[disabled] {
+	@include disabled.disabled;
+}
+
+textarea {
+	resize: none;
+}
+
+:root {
+	&[theme='dark'] {
+		input,
+		textarea,
+		select {
+			color-scheme: dark;
+		}
+	}
+}
+
+select {
+	line-height: 1;
+	appearance: none;
+
+	background-image: url('data:image/svg+xml;utf8,<svg width="24" height="24" viewBox="0 -960 960 960" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M480-361q-8 0-15-2.5t-13-8.5L268-556q-11-11-11-28t11-28q11-11 28-11t28 11l156 156 156-156q11-11 28-11t28 11q11 11 11 28t-11 28L508-372q-6 6-13 8.5t-15 2.5Z" /></svg>');
+	background-repeat: no-repeat;
+	background-position: right var(--padding-1_5x) center;
+	background-size: 20px;
+
+	cursor: pointer;
+
+	padding: var(--padding) calc(var(--padding-4x) + var(--padding)) var(--padding) var(--padding-2x);
+}
+
+:root {
+	&[theme='dark'] {
+		select {
+			background-image: url('data:image/svg+xml;utf8,<svg width="24" height="24" viewBox="0 -960 960 960" fill="%23ebedf0" xmlns="http://www.w3.org/2000/svg"><path d="M480-361q-8 0-15-2.5t-13-8.5L268-556q-11-11-11-28t11-28q11-11 28-11t28 11l156 156 156-156q11-11 28-11t28 11q11 11 11 28t-11 28L508-372q-6 6-13 8.5t-15 2.5Z" /></svg>');
+		}
+	}
+}

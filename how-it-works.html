@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How Menta Works</title>
+<link rel="icon" type="image/svg+xml" href="/menta-logo.svg">
+<link rel="stylesheet" href="/css/global.css">
+<script src="/js/header.js" defer></script>
+</head>
+<body>
+
+{% include 'nav.html' %}
+
+<div class="container" style="padding: var(--padding-12x) var(--padding-6x) var(--padding-12x); max-width: 800px; margin: 0 auto;">
+
+<h1 style="margin-bottom: var(--padding-8x); text-align: center;">How Menta Works</h1>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Overview</h2>
+  <p style="margin-bottom: var(--padding-4x);">Menta uses a hashcash-style proof-of-work challenge to tell humans and bots apart. Instead of asking users to identify images, it requires their browser to solve a computational puzzle.</p>
+  <p style="color: var(--value-color);">The puzzle is designed to be trivial for a human clicking once, but expensive for automated scripts trying to solve thousands of challenges.</p>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-6x);">The Process</h2>
+  
+  <div style="margin-bottom: var(--padding-8x);">
+    <h3 style="margin-bottom: var(--padding-3x);">1. Initialize Session</h3>
+    <p style="margin-bottom: var(--padding-2x);">Client requests a session from <code style="display: inline; padding: 2px 8px;">/init</code></p>
+    <p style="color: var(--value-color);">Server validates rate limits, checks bot signals, and creates a signed session tied to the client's IP.</p>
+  </div>
+  
+  <div style="margin-bottom: var(--padding-8x);">
+    <h3 style="margin-bottom: var(--padding-3x);">2. Get Challenge</h3>
+    <p style="margin-bottom: var(--padding-2x);">Client requests a challenge from <code style="display: inline; padding: 2px 8px;">/challenge</code></p>
+    <p style="color: var(--value-color);">Server generates a random salt and target difficulty based on the client's reputation.</p>
+  </div>
+  
+  <div style="margin-bottom: var(--padding-8x);">
+    <h3 style="margin-bottom: var(--padding-3x);">3. Solve Challenge</h3>
+    <p style="margin-bottom: var(--padding-2x);">Client finds a nonce where <code style="display: inline; padding: 2px 8px;">SHA-256(salt + nonce)</code> starts with N zeros</p>
+    <p style="color: var(--value-color);">This requires brute-force computation, typically taking 1-3 seconds on a modern browser.</p>
+  </div>
+  
+  <div style="margin-bottom: var(--padding-8x);">
+    <h3 style="margin-bottom: var(--padding-3x);">4. Redeem Token</h3>
+    <p style="margin-bottom: var(--padding-2x);">Client submits the solution to <code style="display: inline; padding: 2px 8px;">/redeem</code></p>
+    <p style="color: var(--value-color);">Server verifies the proof, validates the session, and issues a signed clearance token.</p>
+  </div>
+  
+  <div>
+    <h3 style="margin-bottom: var(--padding-3x);">5. Verify Token</h3>
+    <p style="margin-bottom: var(--padding-2x);">Client includes the token in form submissions</p>
+    <p style="color: var(--value-color);">Your backend verifies the token signature and expiration via <code style="display: inline; padding: 2px 8px;">/verify</code>.</p>
+  </div>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Validation Checks</h2>
+  <p style="margin-bottom: var(--padding-4x);">Menta runs 8 validation checks across the challenge lifecycle:</p>
+  <ol style="padding-left: var(--padding-6x);">
+    <li style="margin-bottom: var(--padding-3x);"><strong>Rate limit per IP.</strong> Prevents brute-force from a single address.</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Bot signal checks.</strong> Flags automated traffic patterns.</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Session validity.</strong> Verifies session exists, hasn't expired, and matches IP.</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Session signature.</strong> HMAC proves session originated from this server.</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Challenge signature.</strong> HMAC proves challenge originated from this server.</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Nonce entropy.</strong> Ensures nonce isn't precomputed or reused.</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Proof-of-work.</strong> Hash must meet target difficulty.</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Client pattern.</strong> Solve time analyzed against human range.</li>
+  </ol>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Adaptive Difficulty</h2>
+  <p style="margin-bottom: var(--padding-4x);">Menta automatically adjusts difficulty based on client behavior:</p>
+  <ul style="padding-left: var(--padding-6x);">
+    <li style="margin-bottom: var(--padding-3x);"><strong>New IPs</strong> get higher difficulty until they establish reputation</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Fast solves</strong> trigger difficulty increase (possible bot)</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Many failures</strong> significantly increase difficulty</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Consistent patterns</strong> may indicate automation</li>
+  </ul>
+</div>
+
+<div style="text-align: center; margin-top: var(--padding-12x);">
+  <a href="/docs" class="button" style="margin-right: var(--padding-4x);">View Documentation</a>
+  <a href="/demo" class="button">Try the Demo</a>
+</div>
+
+</div>
+
+{% include 'footer.html' %}
+
+</body>
+</html>

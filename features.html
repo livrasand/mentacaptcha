@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Features: Menta</title>
+<link rel="icon" type="image/svg+xml" href="/menta-logo.svg">
+<link rel="stylesheet" href="/css/global.css">
+<script src="/js/header.js" defer></script>
+</head>
+<body>
+
+{% include 'nav.html' %}
+
+<div class="container" style="padding: var(--padding-12x) var(--padding-6x) var(--padding-12x); max-width: 900px; margin: 0 auto;">
+
+<h1 style="margin-bottom: var(--padding-8x); text-align: center;">Features</h1>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Privacy by Design</h2>
+  <ul style="padding-left: var(--padding-6x);">
+    <li style="margin-bottom: var(--padding-4x);"><strong>Zero third-party telemetry.</strong> No requests to Google, Cloudflare, or any external service.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>No cookies or fingerprints.</strong> Visitor data stays on your server.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>IP truncation.</strong> IPs truncated to /24 (IPv4) or /64 (IPv6) by default.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>Anonymous support.</strong> Open tickets without personal data.</li>
+  </ul>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Bot Protection</h2>
+  <ul style="padding-left: var(--padding-6x);">
+    <li style="margin-bottom: var(--padding-4x);"><strong>Proof-of-work challenges.</strong> Computational puzzles that are trivial for humans, expensive for bots.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>Adaptive difficulty.</strong> Automatically adjusts based on client behavior.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>Rate limiting.</strong> Per-IP and global rate limits prevent abuse.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>Bot signal detection.</strong> Flags suspicious traffic patterns before challenges.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>Session validation.</strong> HMAC-signed sessions tied to client IP.</li>
+  </ul>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Developer Experience</h2>
+  <ul style="padding-left: var(--padding-6x);">
+    <li style="margin-bottom: var(--padding-4x);"><strong>Simple integration.</strong> Two lines of HTML to get started.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>Customizable widget.</strong> Full control via data attributes.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>Internationalization.</strong> All text configurable.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>Theme support.</strong> Light, dark, or auto mode.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>Custom CSS.</strong> Inject your own styles.</li>
+  </ul>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Self-hosted &amp; Free</h2>
+  <ul style="padding-left: var(--padding-6x);">
+    <li style="margin-bottom: var(--padding-4x);"><strong>Open source.</strong> Full source code available on GitHub.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>No limits.</strong> Unlimited domains, unlimited challenges.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>No vendor lock-in.</strong> Run anywhere Python is supported.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>Optional encryption.</strong> SQLCipher support for data at rest.</li>
+  </ul>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Compliance</h2>
+  <ul style="padding-left: var(--padding-6x);">
+    <li style="margin-bottom: var(--padding-4x);"><strong>Data minimization.</strong> Collect only what's necessary.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>Configurable retention.</strong> Automatic cleanup of old data.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>Subject rights.</strong> Export and delete endpoints for DSAR.</li>
+    <li style="margin-bottom: var(--padding-4x);"><strong>Audit logging.</strong> Track admin access and changes.</li>
+  </ul>
+</div>
+
+<div style="text-align: center; margin-top: var(--padding-12x);">
+  <a href="/pricing" class="button" style="margin-right: var(--padding-4x);">View Pricing</a>
+  <a href="/demo" class="button">Try Demo</a>
+</div>
+
+</div>
+
+{% include 'footer.html' %}
+
+</body>
+</html>

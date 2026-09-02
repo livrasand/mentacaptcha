@@ -1,0 +1,12 @@
+@use '../mixins/shadow';
+
+.qr-code-container {
+	.qrcode {
+		min-width: calc(var(--padding) * 30);
+
+		aspect-ratio: 1;
+		overflow: hidden;
+
+		@include shadow.card-action;
+	}
+}

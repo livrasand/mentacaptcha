@@ -1,0 +1,8 @@
+@use '../mixins/media';
+
+.grid-equal-not {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	padding: 0 0 var(--padding-3x);
+}

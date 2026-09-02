@@ -31,7 +31,7 @@ import pyotp
 import qrcode
 import qrcode.image.svg
 from datetime import timedelta
-from flask import Flask, request, jsonify, render_template_string, render_template, send_file, g, session
+from flask import Flask, request, jsonify, render_template_string, render_template, send_file, send_from_directory, g, session
 app = Flask(__name__, template_folder='.')
 
 
@@ -1294,21 +1294,7 @@ def sign_challenge(challenge_id, salt, target, expires):
     """Signs the challenge: HMAC(challenge_id.salt.target.expires)"""
     return _hmac("%s.%s.%s.%s" % (challenge_id, salt, target, expires))
 
-@app.route('/privacy')
-def privacy():
-    return render_template_string(PRIVACY_HTML)
 
-@app.route('/terms')
-def terms():
-    return render_template_string(TERMS_HTML)
-
-@app.route('/dpa')
-def dpa():
-    return render_template_string(DPA_HTML)
-
-@app.route('/baa')
-def baa():
-    return render_template_string(BAA_HTML)
 
 @app.route('/dashboard')
 def dashboard():
@@ -1336,6 +1322,18 @@ def demo():
     # antes de la petición ya manejará la capa invisible si corresponde.
     return render_template('demo.html')
 
+@app.route('/features')
+def features():
+    return render_template('features.html')
+
+@app.route('/how-it-works')
+def how_it_works():
+    return render_template('how-it-works.html')
+
+@app.route('/docs')
+def docs():
+    return render_template('docs.html')
+
 @app.route('/menta-logo.svg')
 def logo():
     return send_file(os.path.join(os.path.dirname(__file__), 'menta-logo.svg'), mimetype='image/svg+xml')
@@ -1343,6 +1341,18 @@ def logo():
 @app.route('/menta-in-action.gif')
 def hero_gif():
     return send_file(os.path.join(os.path.dirname(__file__), 'menta-in-action.gif'), mimetype='image/gif')
+
+@app.route('/css/<path:filename>')
+def styles(filename):
+    return send_from_directory(os.path.join(os.path.dirname(__file__), 'css'), filename)
+
+@app.route('/fonts/<path:filename>')
+def fonts(filename):
+    return send_from_directory(os.path.join(os.path.dirname(__file__), 'fonts'), filename)
+
+@app.route('/js/<path:filename>')
+def scripts(filename):
+    return send_from_directory(os.path.join(os.path.dirname(__file__), 'js'), filename)
 
 @app.route('/')
 def index():
@@ -2590,14 +2600,8 @@ WIDGET_JS = r"""class CapWidget extends HTMLElement {
         const rtl = this.isRTL;
         const dir = rtl ? 'rtl' : 'ltr';
         const initialLabel = this.i18n('initial-state', "Verify you're human");
-        const privacyLabel = this.i18n('privacy', 'Privacy');
-        const termsLabel = this.i18n('terms', 'Terms');
-        const privacyUrl = this.getAttribute('data-cap-privacy-url');
-        const termsUrl = this.getAttribute('data-cap-terms-url');
         const ep = this.getAttribute('data-cap-api-endpoint') || '';
         const logoUrl = ep.replace(/\/*$/, '') + '/menta-logo.svg';
-        const privacyLink = privacyUrl ? `<a href="${privacyUrl}" target="_blank" rel="noopener" class="link">${privacyLabel}</a>` : `<span class="link">${privacyLabel}</span>`;
-        const termsLink = termsUrl ? `<a href="${termsUrl}" target="_blank" rel="noopener" class="link">${termsLabel}</a>` : `<span class="link">${termsLabel}</span>`;
         this.shadowRoot.innerHTML = `
 <style>
 :host { display: inline-block; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
@@ -2613,10 +2617,6 @@ WIDGET_JS = r"""class CapWidget extends HTMLElement {
 @keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
 .solved .checkbox { background:#f0f0f0; border-color:#4CAF50; }
 .solved .checkbox::after { content:'\u2713'; color:#4CAF50; font-weight:bold; }
-.links { position:absolute; right:20px; bottom:8px; display:flex; gap:0.4rem; font-size:8px; color:#757575; }
-.links .link { color:#757575; text-decoration:underline; text-underline-offset:2px; }
-.links .link:hover { color:#333; }
-.links span.link { text-decoration:none; cursor:default; }
 .mint-accent { fill: #2ECC71; color: #2ECC71; }
 .message { display:none; margin-top:6px; font-size:11px; color:#757575; max-width:300px; line-height:1.4; }
 .message.protected { color:#2ECC71; }
@@ -2881,80 +2881,7 @@ SHIELD_JS = r"""(function () {
     }
 })();"""
 
-PRIVACY_HTML = """<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Privacy Policy — Menta</title>
-<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;max-width:700px;margin:2rem auto;padding:0 1rem;line-height:1.6;}h1{font-size:1.5rem;}a{color:#000;}</style>
-</head>
-<body>
-<h1>Privacy Policy</h1>
-<p>MentaCaptcha is a privacy-first, self-hosted CAPTCHA. We do not use cookies, fingerprinting or third-party telemetry.</p>
-<ul>
-<li>We collect only the minimum data needed for bot protection: a hashed/anonymized IP prefix, challenge metadata, and solve timestamps.</li>
-<li>Full IP addresses are not logged by default. Where required, they may be kept only for the time needed for rate limiting.</li>
-<li>Data is stored in the EU region for our SaaS offering and encrypted at rest with SQLCipher.</li>
-<li>Data retention is configurable and automatically enforced by the platform.</li>
-<li>Users have the right to access, export and delete their data via the admin endpoints.</li>
-</ul>
-<p>For data subject requests, contact the site operator.</p>
-<p><a href="/">&larr; Back</a></p>
-</body>
-</html>"""
 
-TERMS_HTML = """<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Terms of Service — Menta</title>
-<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;max-width:700px;margin:2rem auto;padding:0 1rem;line-height:1.6;}h1{font-size:1.5rem;}a{color:#000;}</style>
-</head>
-<body>
-<h1>Terms of Service</h1>
-<p>MentaCaptcha is provided "as is" for bot protection on websites and applications.</p>
-<ul>
-<li>Self-hosted deployments are the responsibility of the operator.</li>
-<li>SaaS users are bound by the Data Processing Addendum and Privacy Policy.</li>
-<li>Do not use MentaCaptcha to violate any applicable law.</li>
-<li>We may update these terms; continued use constitutes acceptance.</li>
-</ul>
-<p><a href="/">&larr; Back</a></p>
-</body>
-</html>"""
-
-DPA_HTML = """<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Data Processing Addendum — Menta</title>
-<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;max-width:700px;margin:2rem auto;padding:0 1rem;line-height:1.6;}h1{font-size:1.5rem;}a{color:#000;}</style>
-</head>
-<body>
-<h1>Data Processing Addendum</h1>
-<p>This DPA applies to MentaCaptcha SaaS customers.</p>
-<ul>
-<li>Menta acts as a data processor for CAPTCHA challenge and session data.</li>
-<li>Processing is limited to rate limiting, abuse detection and token issuance.</li>
-<li>Data is encrypted in transit and at rest; hosted in the EU.</li>
-<li>Sub-processors are limited to the hosting infrastructure provider.</li>
-<li>Customers may request data export or deletion at any time.</li>
-</ul>
-<p><a href="/">&larr; Back</a></p>
-</body>
-</html>"""
-
-BAA_HTML = """<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Business Associate Agreement — Menta</title>
-<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;max-width:700px;margin:2rem auto;padding:0 1rem;line-height:1.6;}h1{font-size:1.5rem;}a{color:#000;}</style>
-</head>
-<body>
-<h1>Business Associate Agreement</h1>
-<p>MentaCaptcha does not process Protected Health Information (PHI) by default. This BAA is provided for healthcare customers who require it under HIPAA.</p>
-<ul>
-<li>Menta will safeguard any PHI in accordance with HIPAA Security Rule requirements.</li>
-<li>Encryption, access controls, audit logging and backup are implemented.</li>
-<li>Self-hosted deployments remain the responsibility of the covered entity.</li>
-</ul>
-<p>Contact us to execute a signed BAA.</p>
-<p><a href="/">&larr; Back</a></p>
-</body>
-</html>"""
 
 if __name__ == '__main__':
-    app.run(port=5000)
+    app.run(debug=True, port=5000)

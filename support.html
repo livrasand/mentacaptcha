@@ -3,118 +3,90 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Menta CAPTCHA Anonymous Support Center</title>
+<title>Support: Menta</title>
 <link rel="icon" type="image/svg+xml" href="/menta-logo.svg">
-<style>
-  :root { --menta: #22C55E; }
-  body { font-family: "Courier New", monospace; margin: 0; padding: 2rem 0; background: #fff; color: #000; }
-  .container { max-width: 1000px; margin: 0 auto; padding: 0 1rem; }
-  h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
-  hr { border: none; border-top: 2px solid #000; margin: 1rem 0; }
-  .nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.5rem; }
-  .nav .links { margin: 0; }
-  p { max-width: 48rem; line-height: 1.6; margin-bottom: 1.25rem; }
-  a { color: #000; }
-  a:hover { background: #000; color: #fff; }
-  .form { margin: 1.5rem 0; }
-  input[type="text"], textarea {
-    font-family: "Courier New", monospace;
-    padding: 0.75rem;
-    border: 1px solid #000;
-    width: 420px;
-    max-width: 100%;
-    display: block;
-    margin-bottom: 0.5rem;
-  }
-  input[type="text"]:focus, textarea:focus {
-    outline: none;
-    border-color: var(--menta);
-  }
-  textarea { height: 6rem; }
-  button {
-    font-family: "Courier New", monospace;
-    padding: 0.5rem 1rem;
-    border: 1px solid #000;
-    background: #000;
-    color: #fff;
-    cursor: pointer;
-  }
-  button:hover { background: var(--menta); color: #000; }
-  .cta {
-    background: var(--menta);
-    color: #000;
-    border: 1px solid var(--menta);
-  }
-  .cta:hover { filter: brightness(0.95); }
-  .error { color: #c00; margin-top: 1rem; }
-  .success { color: #070; margin-top: 1rem; }
-  .warning { color: #c70; margin-top: 1rem; }
-  h2 { margin-top: 2.5rem; margin-bottom: 1rem; }
-  .footer { margin-top: 2rem; color: #999; font-size: 0.8rem; }
-  .ticket { border: 1px solid #000; padding: 1rem; margin: 1rem 0; max-width: 48rem; }
-  .ticket .meta { color: #555; font-size: 0.85rem; margin-bottom: 0.5rem; }
-  .chat { margin: 0.75rem 0; padding: 0.75rem; border: 1px solid #000; max-width: 42rem; }
-  .chat .meta { font-size: 0.75rem; color: #555; margin-bottom: 0.25rem; }
-  .chat.admin { background: #f0f0f0; }
-  .chat.user { background: #fff; }
-  .secret-link {
-    background: #f0f0f0;
-    padding: 0.5rem;
-    word-break: break-all;
-    display: block;
-    margin: 0.5rem 0;
-  }
-</style>
+<link rel="stylesheet" href="/css/global.css">
+<script src="/js/header.js" defer></script>
 </head>
 <body>
 
 {% include 'nav.html' %}
-<div class="container">
+
+<div class="container" style="padding: var(--padding-12x) var(--padding-6x) var(--padding-12x); max-width: 700px; margin: 0 auto;">
+
+<div style="text-align: center; margin-bottom: var(--padding-12x);">
+  <h1 style="margin-bottom: var(--padding-4x);">Anonymous Support</h1>
+  <p style="color: var(--value-color); font-size: 1.1rem;">No email, name, or personal data required.</p>
+</div>
 
 <div id="form-view">
-  <h2>Anonymous Support Center</h2>
-  <p>We value your privacy. No email, name, or personal data is required. After submitting, you will receive a secret link. <strong>Save it in your favorites</strong> — it is the only way to access your ticket.</p>
-  <p>You can optionally provide a <a href="https://ntfy.sh" target="_blank">ntfy</a> topic to receive a generic notification when we reply. We will only send: "You have a new message at <em>link</em>".</p>
-
-  <p><strong>Quick templates:</strong>
-    <button type="button" class="template-btn" data-subject="Domain ownership claim" data-message="I want to claim the domain [your-domain.com] for my account. The account number is [your-account-number].">Domain claim</button>
-    <button type="button" class="template-btn" data-subject="Trial activation" data-message="I would like to activate my SaaS account after the 45-day trial. My account number is [your-account-number].">Activate</button>
-    <button type="button" class="template-btn" data-subject="Account reactivation" data-message="My account [your-account-number] has expired. I would like to reactivate it. Please let me know the next steps.">Reactivate</button>
-    <button type="button" class="template-btn" data-subject="Domain not authorized" data-message="My widget shows that the domain is not registered or authorized by Menta. My account number is [your-account-number] and my domain is [your-domain.com].">Not authorized</button>
-    <button type="button" class="template-btn" data-subject="Account deletion request" data-message="Please delete my Menta account and all associated data. My account number is [your-account-number].">Delete account</button>
-    <button type="button" class="template-btn" data-subject="General question" data-message="I have a question about Menta. [Write your question here].">Question</button>
-  </p>
-
-  <div class="form" role="form" aria-label="Support ticket">
-    <label for="subject">Subject:</label>
-    <input type="text" id="subject" placeholder="e.g. Domain ownership claim, Trial activation">
-    <label for="message">Message:</label>
-    <textarea id="message" placeholder="Describe your issue. If this is a claim, include the account number or domain."></textarea>
-    <label for="ntfy-topic">ntfy topic (optional):</label>
-    <input type="text" id="ntfy-topic" placeholder="my-menta-alerts">
-    <label for="account-number">Account number (optional):</label>
-    <input type="text" id="account-number" placeholder="16-digit number">
-    <button id="submit-ticket" class="cta" type="button">Send ticket</button>
+  <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+    <h2 style="margin-bottom: var(--padding-4x);">How it works</h2>
+    <ul style="padding-left: var(--padding-6x);">
+      <li style="margin-bottom: var(--padding-3x);">Submit a ticket with your question or issue</li>
+      <li style="margin-bottom: var(--padding-3x);">Receive a secret link to access your ticket</li>
+      <li style="margin-bottom: var(--padding-3x);"><strong>Save the link</strong> — it's the only way to access your ticket</li>
+      <li style="margin-bottom: var(--padding-3x);">Optionally add a ntfy topic to get notified of replies</li>
+    </ul>
   </div>
-  <div id="ticket-error" class="error" style="display:none;" role="status" aria-live="polite"></div>
-  <div id="ticket-success" class="success" style="display:none;" role="status" aria-live="polite"></div>
+
+  <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+    <h2 style="margin-bottom: var(--padding-4x);">Quick Templates</h2>
+    <p style="margin-bottom: var(--padding-4x);">Click a template to pre-fill the form:</p>
+    <div style="display: flex; flex-wrap: wrap; gap: var(--padding-3x); margin-bottom: var(--padding-6x);">
+      <button type="button" class="template-btn" data-subject="Domain ownership claim" data-message="I want to claim the domain [your-domain.com] for my account. The account number is [your-account-number].">Domain claim</button>
+      <button type="button" class="template-btn" data-subject="Trial activation" data-message="I would like to activate my SaaS account after the 45-day trial. My account number is [your-account-number].">Activate</button>
+      <button type="button" class="template-btn" data-subject="Account reactivation" data-message="My account [your-account-number] has expired. I would like to reactivate it.">Reactivate</button>
+      <button type="button" class="template-btn" data-subject="Domain not authorized" data-message="My widget shows domain not authorized. Account: [your-account-number], Domain: [your-domain.com].">Not authorized</button>
+      <button type="button" class="template-btn" data-subject="Account deletion request" data-message="Please delete my Menta account and all associated data. Account: [your-account-number].">Delete account</button>
+      <button type="button" class="template-btn" data-subject="General question" data-message="I have a question about Menta.">Question</button>
+    </div>
+  </div>
+
+  <div class="card-container" style="padding: var(--padding-6x);">
+    <h2 style="margin-bottom: var(--padding-6x);">Submit a Ticket</h2>
+    <div class="form" role="form" aria-label="Support ticket">
+      <label for="subject">Subject</label>
+      <input type="text" id="subject" placeholder="e.g. Domain ownership claim">
+      <label for="message">Message</label>
+      <textarea id="message" placeholder="Describe your issue..." rows="5"></textarea>
+      <label for="ntfy-topic">ntfy topic (optional)</label>
+      <input type="text" id="ntfy-topic" placeholder="my-menta-alerts">
+      <label for="account-number">Account number (optional)</label>
+      <input type="text" id="account-number" placeholder="16-digit number">
+      <button id="submit-ticket" type="button" style="width: 100%; margin-top: var(--padding-4x);">Submit Ticket</button>
+    </div>
+    <div id="ticket-error" class="error" style="display:none; margin-top: var(--padding-4x);" role="status" aria-live="polite"></div>
+    <div id="ticket-success" class="success" style="display:none; margin-top: var(--padding-4x);" role="status" aria-live="polite"></div>
+  </div>
 </div>
 
 <div id="ticket-view" style="display:none;">
-  <p class="warning"><strong>Keep this link safe.</strong> It is the only way to access your ticket.</p>
-  <h3 id="ticket-subject"></h3>
-  <div class="meta" id="ticket-meta"></div>
-  <div class="ticket">
-    <div id="ticket-message"></div>
+  <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+    <p class="warning" style="margin-bottom: var(--padding-4x);"><strong>Keep this link safe.</strong> It is the only way to access your ticket.</p>
+    <h3 id="ticket-subject" style="margin-bottom: var(--padding-3x);"></h3>
+    <div class="meta" id="ticket-meta" style="color: var(--value-color);"></div>
+  </div>
+
+  <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+    <div id="ticket-message" style="margin-bottom: var(--padding-6x);"></div>
     <div id="ticket-replies"></div>
   </div>
-  <div id="closed-message" class="warning" style="display:none;" role="status" aria-live="polite">This ticket is closed.</div>
-  <div id="reply-form" class="form" role="form" aria-label="Reply to ticket">
-    <label for="reply-body">Reply:</label>
-    <textarea id="reply-body"></textarea>
-    <button id="send-reply" type="button">Send reply</button>
+
+  <div id="closed-message" class="card-container" style="display:none; margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+    <p class="warning">This ticket is closed.</p>
   </div>
-  <div id="reply-error" class="error" style="display:none;" role="status" aria-live="polite"></div>
+
+  <div id="reply-form" class="card-container" style="padding: var(--padding-6x);">
+    <h3 style="margin-bottom: var(--padding-4x);">Reply</h3>
+    <div class="form" role="form" aria-label="Reply to ticket">
+      <textarea id="reply-body" placeholder="Your reply..." rows="4"></textarea>
+      <button id="send-reply" type="button" style="width: 100%; margin-top: var(--padding-4x);">Send Reply</button>
+    </div>
+    <div id="reply-error" class="error" style="display:none; margin-top: var(--padding-4x);" role="status" aria-live="polite"></div>
+  </div>
+</div>
+
 </div>
 
 {% include 'footer.html' %}
@@ -231,6 +203,5 @@
   });
 </script>
 
-</div>
 </body>
 </html>

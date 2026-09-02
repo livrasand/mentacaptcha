@@ -1,0 +1,45 @@
+@use './collections';
+@use './media';
+
+@mixin list {
+	.title,
+	.data {
+		border-right: 1px solid var(--color-card-contrast);
+	}
+
+	.title {
+		@include collections.title;
+	}
+
+	.data {
+		min-height: var(--padding-8x);
+
+		grid-column: span 4;
+
+		@include media.min-width(large) {
+			grid-column: inherit;
+		}
+	}
+
+	.action {
+		@include collections.action;
+	}
+
+	.data-selected {
+		display: none;
+
+		@include media.min-width(large) {
+			display: block;
+		}
+	}
+
+	button.text {
+		&:hover,
+		&:focus {
+			span {
+				background: var(--color-tertiary);
+				color: var(--color-tertiary-contrast);
+			}
+		}
+	}
+}

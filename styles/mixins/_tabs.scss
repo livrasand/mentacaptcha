@@ -1,0 +1,46 @@
+@mixin _tab-button {
+	display: flex;
+	align-items: center;
+	gap: var(--padding);
+
+	position: relative;
+
+	text-decoration: none;
+
+	padding: 2px var(--padding);
+
+	transition: all var(--animation-time) ease-out;
+}
+
+@mixin _tab-hover {
+	background: var(--color-primary-opaque);
+	color: var(--color-primary-opaque-contrast);
+}
+
+@mixin tabs {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+
+	font-size: var(--font-size-small);
+
+	:global(a:not(.tab)) {
+		@include _tab-button;
+		border-radius: var(--border-radius);
+		margin: 0;
+
+		&:hover,
+		&:focus {
+			@include _tab-hover;
+		}
+	}
+}
+
+@mixin tab {
+	@include _tab-button;
+
+	&:hover,
+	&:focus {
+		@include _tab-hover;
+	}
+}

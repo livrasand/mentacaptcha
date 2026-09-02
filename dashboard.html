@@ -4,161 +4,102 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="admin-token-required" content="{{ admin_token_required|lower }}">
-<title>Menta — Dashboard</title>
+<title>Dashboard: Menta</title>
 <link rel="icon" type="image/svg+xml" href="/menta-logo.svg">
-<style>
-  :root { --menta: #22C55E; }
-  body { font-family: "Courier New", monospace; margin: 0; padding: 2rem 0; background: #fff; color: #000; }
-  .container { max-width: 1000px; margin: 0 auto; padding: 0 1rem; }
-  h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
-  hr { border: none; border-top: 2px solid #000; margin: 1rem 0; }
-  a { color: #000; }
-  a:hover { background: #000; color: #fff; }
-  .nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.5rem; }
-  .nav .links { margin: 0; }
-  .form { margin: 1.5rem 0; max-width: 800px; }
-  input[type="password"] {
-    font-family: "Courier New", monospace;
-    padding: 0.5rem;
-    border: 1px solid #000;
-    width: 300px;
-    max-width: 100%;
-  }
-  button {
-    font-family: "Courier New", monospace;
-    padding: 0.5rem 1rem;
-    border: 1px solid #000;
-    background: #000;
-    color: #fff;
-    cursor: pointer;
-  }
-  button:hover { background: var(--menta); color: #000; }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1rem;
-    margin-top: 1.5rem;
-  }
-  .card {
-    border: 1px solid #000;
-    padding: 1rem;
-    min-height: 100px;
-  }
-  .card .label { font-size: 0.8rem; color: #555; text-transform: uppercase; }
-  .card .value { font-size: 2rem; font-weight: 700; margin-top: 0.5rem; }
-  .error { color: #c00; margin-top: 1rem; }
-  h2 { margin-top: 2.5rem; margin-bottom: 1rem; }
-  h3 { margin-top: 1.5rem; margin-bottom: 0.75rem; }
-  .footer { margin-top: 2rem; color: #999; font-size: 0.8rem; }
-  .success { color: #070; margin-top: 1rem; }
-  .warning { color: #c70; margin-top: 1rem; }
-  input[type="text"], textarea {
-    font-family: "Courier New", monospace;
-    padding: 0.5rem;
-    border: 1px solid #000;
-    width: 300px;
-    max-width: 100%;
-  }
-  textarea { height: 5rem; }
-  .account-number {
-    font-size: 1.2rem;
-    font-weight: 700;
-    background: #f0f0f0;
-    padding: 0.5rem;
-    display: inline-block;
-    margin: 0.5rem 0;
-  }
-  .banner {
-    border: 1px solid #000;
-    padding: 1rem;
-    margin: 1rem 0;
-    background: #f9f9f9;
-  }
-  .banner.trial { border-left: 4px solid #070; }
-  .banner.expired { border-left: 4px solid #c00; }
-  .banner.pending { border-left: 4px solid #c70; }
-  select {
-    font-family: "Courier New", monospace;
-    padding: 0.5rem;
-    border: 1px solid #000;
-    width: 300px;
-    max-width: 100%;
-  }
-</style>
+<link rel="stylesheet" href="/css/global.css">
+<script src="/js/header.js" defer></script>
+<script src="/js/copy.js" defer></script>
+<script src="/js/identifier.js" defer></script>
 </head>
 <body>
 
 {% include 'nav.html' %}
-<div class="container">
 
-<div id="admin-login-form" class="form" role="form" aria-label="Admin dashboard">
-  <label for="token">Admin token:</label><br>
-  <input type="password" id="token" placeholder="Bearer token" aria-describedby="error"><br>
-  <label for="admin-totp">Admin TOTP code / recovery code:</label><br>
-  <input type="text" id="admin-totp" placeholder="000000" style="width: 220px;" aria-describedby="error"><br>
-  <label style="display:block;margin:0.5rem 0;">
-    <input type="checkbox" id="remember-token" style="width:auto;"> Remember me for 30 days
-  </label>
-  <button id="load" type="button">Load metrics</button>
+<div class="container" style="padding: var(--padding-12x) var(--padding-6x) var(--padding-12x); max-width: 1000px; margin: 0 auto;">
+
+<div style="text-align: center; margin-bottom: var(--padding-12x);">
+  <h1 style="margin-bottom: var(--padding-4x);">Admin Dashboard</h1>
+  <p style="color: var(--value-color);">Monitor metrics, manage accounts, and handle support tickets.</p>
 </div>
 
-<div id="admin-2fa-setup" style="display:none;">
-  <h2>Admin 2FA setup required</h2>
-  <p>Scan the QR code with your authenticator app, then enter the 6-digit code to finish setup.</p>
-  <div id="admin-2fa-qr" style="margin: 1rem 0;"></div>
-  <label for="admin-2fa-code">Verification code:</label><br>
-  <input type="text" id="admin-2fa-code" placeholder="000000" style="width: 220px;"><br>
-  <button id="verify-admin-2fa" type="button">Verify and enable 2FA</button>
-  <div id="admin-2fa-result" class="success" style="display:none;" role="status" aria-live="polite"></div>
+<div id="admin-login-form" class="card-container" style="max-width: 500px; margin: 0 auto var(--padding-12x); padding: var(--padding-8x);">
+  <h2 style="margin-bottom: var(--padding-6x); text-align: center;">Login</h2>
+  <div class="form" role="form" aria-label="Admin dashboard">
+    <label for="token">Admin token</label>
+    <input type="password" id="token" placeholder="Bearer token">
+    <label for="admin-totp">TOTP code / recovery code</label>
+    <input type="text" id="admin-totp" placeholder="000000">
+    <label class="options">
+      <input type="checkbox" id="remember-token"> Remember me for 30 days
+    </label>
+    <button id="load" type="button" style="width: 100%; margin-top: var(--padding-4x);">Load Metrics</button>
+  </div>
 </div>
 
-<div id="error" class="error" style="display:none;" role="status" aria-live="polite"></div>
+<div id="admin-2fa-setup" style="display:none;" class="card-container" style="max-width: 500px; margin: 0 auto; padding: var(--padding-8x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Admin 2FA Setup Required</h2>
+  <p style="margin-bottom: var(--padding-4x);">Scan the QR code with your authenticator app, then enter the 6-digit code to finish setup.</p>
+  <div id="admin-2fa-qr" style="margin: var(--padding-4x) 0;"></div>
+  <label for="admin-2fa-code">Verification code</label>
+  <input type="text" id="admin-2fa-code" placeholder="000000">
+  <button id="verify-admin-2fa" type="button" style="width: 100%; margin-top: var(--padding-4x);">Verify and Enable 2FA</button>
+  <div id="admin-2fa-result" class="success" style="display:none; margin-top: var(--padding-4x);" role="status" aria-live="polite"></div>
+</div>
 
-<div class="grid" id="metrics" style="display:none;">
-  <div class="card">
-    <div class="label">Bot IPs (1h)</div>
-    <div class="value" id="bot_ips_1h">0</div>
+<div id="error" class="error" style="display:none; margin-bottom: var(--padding-8x);" role="status" aria-live="polite"></div>
+
+<div class="grid" id="metrics" style="display:none; margin-bottom: var(--padding-12x); gap: var(--padding-4x);">
+  <div class="card-container" style="padding: var(--padding-6x); text-align: center;">
+    <div class="label" style="margin-bottom: var(--padding-2x);">Bot IPs (1h)</div>
+    <div class="value" id="bot_ips_1h" style="font-size: 2rem; font-weight: 800;">0</div>
   </div>
-  <div class="card">
-    <div class="label">Failures (1h)</div>
-    <div class="value" id="total_failures_1h">0</div>
+  <div class="card-container" style="padding: var(--padding-6x); text-align: center;">
+    <div class="label" style="margin-bottom: var(--padding-2x);">Failures (1h)</div>
+    <div class="value" id="total_failures_1h" style="font-size: 2rem; font-weight: 800;">0</div>
   </div>
-  <div class="card">
-    <div class="label">Solved (1h)</div>
-    <div class="value" id="solves_1h">0</div>
+  <div class="card-container" style="padding: var(--padding-6x); text-align: center;">
+    <div class="label" style="margin-bottom: var(--padding-2x);">Solved (1h)</div>
+    <div class="value" id="solves_1h" style="font-size: 2rem; font-weight: 800;">0</div>
   </div>
-  <div class="card">
-    <div class="label">Active sessions</div>
-    <div class="value" id="sessions_active">0</div>
+  <div class="card-container" style="padding: var(--padding-6x); text-align: center;">
+    <div class="label" style="margin-bottom: var(--padding-2x);">Active Sessions</div>
+    <div class="value" id="sessions_active" style="font-size: 2rem; font-weight: 800;">0</div>
   </div>
-  <div class="card">
-    <div class="label">DB size</div>
-    <div class="value" id="db_size">0</div>
+  <div class="card-container" style="padding: var(--padding-6x); text-align: center;">
+    <div class="label" style="margin-bottom: var(--padding-2x);">DB Size</div>
+    <div class="value" id="db_size" style="font-size: 2rem; font-weight: 800;">0</div>
   </div>
 </div>
 
 <div id="admin-section" style="display:none;">
-<h2>Administration</h2>
-<p>Manage accounts, activate paid subscriptions and respond to anonymous support tickets from one place. Domain protection prevents duplicate accounts and keeps the service fair.</p>
+  <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+    <h2 style="margin-bottom: var(--padding-4x);">Accounts</h2>
+    <p style="color: var(--value-color); margin-bottom: var(--padding-6x);">Manage customer accounts, activate subscriptions, and remove accounts.</p>
+    <div id="accounts-list"></div>
+  </div>
 
-<h3>Accounts</h3>
-<p>Manage customer accounts, activate subscriptions, and remove accounts.</p>
-<div id="accounts-list" style="margin: 1rem 0;"></div>
+  <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6px);">
+    <h2 style="margin-bottom: var(--padding-4x);">Support Tickets</h2>
+    <p style="color: var(--value-color); margin-bottom: var(--padding-6x);">View and respond to anonymous support tickets from users.</p>
+    <div id="tickets-list"></div>
+  </div>
 
-<h3>Support tickets</h3>
-<p>View and respond to anonymous support tickets from users.</p>
-<div id="tickets-list" style="margin: 1rem 0;"></div>
-
-<h2>Data subject requests</h2>
-<p>Export or delete personal data associated with an IP address or prefix.</p>
-<div class="form">
-  <label for="ip">Identifier (IP prefix or full IP):</label><br>
-  <input type="text" id="ip" placeholder="e.g. 203.0.113.0/24" aria-describedby="data-error">
-  <button id="export" type="button">Export data</button>
-  <button id="delete" type="button" style="background:#fff;color:#000;">Delete data</button>
+  <div class="card-container" style="padding: var(--padding-6x);">
+    <h2 style="margin-bottom: var(--padding-4x);">Data Subject Requests</h2>
+    <p style="color: var(--value-color); margin-bottom: var(--padding-6x);">Export or delete personal data associated with an IP address or prefix.</p>
+    <div class="form">
+      <label for="ip">Identifier (IP prefix or full IP)</label>
+      <input type="text" id="ip" placeholder="e.g. 203.0.113.0/24">
+      <div style="display: flex; gap: var(--padding-3x); margin-top: var(--padding-4x);">
+        <button id="export" type="button">Export Data</button>
+        <button id="delete" type="button" class="error">Delete Data</button>
+      </div>
+    </div>
+    <div id="data-error" class="error" style="display:none; margin-top: var(--padding-4x);" role="status" aria-live="polite"></div>
+    <pre id="data-output" style="display:none; margin-top: var(--padding-4x); background:var(--color-body); padding:var(--padding-4x); overflow-x:auto; max-height:20rem;"></pre>
+  </div>
 </div>
-<div id="data-error" class="error" style="display:none;" role="status" aria-live="polite"></div>
-<pre id="data-output" style="display:none;background:#f0f0f0;padding:1rem;overflow-x:auto;max-height:20rem;"></pre>
+
 </div>
 
 {% include 'footer.html' %}
@@ -293,7 +234,7 @@
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
       admin2faSecret = data.secret;
-      document.getElementById('admin-2fa-qr').innerHTML = '<img src="data:image/svg+xml;base64,' + data.qr + '" alt="QR" style="max-width:240px;border:1px solid #000;"><br><code>' + data.uri + '</code>';
+      document.getElementById('admin-2fa-qr').innerHTML = '<img src="data:image/svg+xml;base64,' + data.qr + '" alt="QR" style="max-width:240px;border:1px solid var(--color-card-contrast);"><br><code>' + data.uri + '</code>';
     } catch (e) {
       document.getElementById('error').textContent = e.message;
       document.getElementById('error').style.display = 'block';
@@ -331,21 +272,23 @@
       const data = await r.json();
       if (!r.ok) handleAdminError(r, data);
       if (!data.accounts.length) {
-        el.textContent = 'No accounts yet.';
+        el.innerHTML = '<p style="color: var(--value-color);">No accounts yet.</p>';
         return;
       }
       const table = document.createElement('table');
+      table.className = 'table-container';
       table.style.borderCollapse = 'collapse';
-      table.innerHTML = '<tr><th style="text-align:left;padding:0.5rem;border:1px solid #000;">Account</th><th style="text-align:left;padding:0.5rem;border:1px solid #000;">Domain</th><th style="text-align:left;padding:0.5rem;border:1px solid #000;">Plan</th><th style="text-align:left;padding:0.5rem;border:1px solid #000;">Status</th><th style="text-align:left;padding:0.5rem;border:1px solid #000;">Trial left</th><th style="text-align:left;padding:0.5rem;border:1px solid #000;">Action</th></tr>';
+      table.style.width = '100%';
+      table.innerHTML = '<thead><tr><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Account</th><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Domain</th><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Plan</th><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Status</th><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Trial Left</th><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Actions</th></tr></thead>';
       for (const a of data.accounts) {
         const tr = document.createElement('tr');
-        tr.innerHTML = '<td style="padding:0.5rem;border:1px solid #000;">' + a.account_number + '</td>' +
-          '<td style="padding:0.5rem;border:1px solid #000;">' + a.primary_domain + '</td>' +
-          '<td style="padding:0.5rem;border:1px solid #000;">' + a.plan + '</td>' +
-          '<td style="padding:0.5rem;border:1px solid #000;">' + a.status + '</td>' +
-          '<td style="padding:0.5rem;border:1px solid #000;">' + (a.trial_days_left != null ? a.trial_days_left + 'd' : '-') + '</td>' +
-          '<td style="padding:0.5rem;border:1px solid #000;"><button class="activate" data-acc="' + a.account_number + '" data-plan="' + a.plan + '">Activate</button> ' +
-          '<button class="delete-account" data-acc="' + a.account_number + '" style="background:#fff;color:#000;">Delete</button></td>';
+        tr.innerHTML = '<td style="padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);"><span data-identifier="' + a.account_number + '" data-what="account"></span></td>' +
+          '<td style="padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);"><span data-identifier="' + a.primary_domain + '" data-what="domain"></span></td>' +
+          '<td style="padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);">' + a.plan + '</td>' +
+          '<td style="padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);">' + a.status + '</td>' +
+          '<td style="padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);">' + (a.trial_days_left != null ? a.trial_days_left + 'd' : '-') + '</td>' +
+          '<td style="padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);"><button class="activate" data-acc="' + a.account_number + '" data-plan="' + a.plan + '">Activate</button> ' +
+          '<button class="delete-account" data-acc="' + a.account_number + '">Delete</button></td>';
         table.appendChild(tr);
       }
       el.appendChild(table);
@@ -355,6 +298,7 @@
       for (const btn of el.querySelectorAll('.delete-account')) {
         btn.addEventListener('click', (e) => deleteAccount(e.target.dataset.acc));
       }
+      if (window.MentaIdentifier) window.MentaIdentifier.initAll(el);
     } catch (e) {
       el.textContent = 'Unable to load accounts: ' + e.message;
     }
@@ -402,7 +346,7 @@
       const data = await r.json();
       if (!r.ok) handleAdminError(r, data);
       if (!data.tickets.length) {
-        el.textContent = 'No support tickets.';
+        el.innerHTML = '<p style="color: var(--value-color);">No support tickets.</p>';
         return;
       }
       const ul = document.createElement('ul');
@@ -410,9 +354,10 @@
       const tokenQuery = adminToken ? '?token=' + encodeURIComponent(adminToken) : '';
       for (const t of data.tickets) {
         const li = document.createElement('li');
+        li.style.marginBottom = 'var(--padding-3x)';
         li.innerHTML = '<a href="/support/' + encodeURIComponent(t.id) + tokenQuery + '" target="_blank">' + t.subject + '</a> (' + t.status + ') — ' + new Date(t.created_at * 1000).toLocaleString() +
           ' <button type="button" class="close-ticket" data-id="' + t.id + '">Close</button>' +
-          ' <button type="button" class="delete-ticket" data-id="' + t.id + '" style="background:#fff;color:#000;">Delete</button>';
+          ' <button type="button" class="delete-ticket" data-id="' + t.id + '">Delete</button>';
         ul.appendChild(li);
       }
       el.appendChild(ul);
@@ -466,6 +411,5 @@
   loadMetrics(true).then(success => { if (success) { loadAccounts(); loadTickets(); } });
 </script>
 
-</div>
 </body>
 </html>

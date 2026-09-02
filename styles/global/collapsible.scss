@@ -1,0 +1,82 @@
+@use '../mixins/interaction';
+
+.collapsible {
+	margin: var(--padding-1_5x) 0 var(--padding-4x);
+
+	button {
+		border-color: transparent;
+		background-color: transparent;
+		box-shadow: none;
+	}
+
+	.header {
+		position: relative;
+
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		flex-direction: row-reverse;
+		gap: var(--padding);
+
+		outline: none;
+
+		color: var(--placeholder-color);
+		font-size: var(--font-size-very-small);
+
+		@include interaction.tappable;
+		user-select: none;
+
+		&:focus {
+			filter: contrast(1.25);
+		}
+
+		.square {
+			display: inline-flex;
+			justify-content: center;
+			align-items: center;
+
+			border: 1px solid currentColor;
+			border-radius: 50%;
+
+			height: calc(var(--padding-3x) + var(--padding-0_5x));
+			width: calc(var(--padding-3x) + var(--padding-0_5x));
+			padding: 0;
+			margin: 0;
+
+			color: inherit;
+		}
+	}
+
+	.wrapper {
+		margin-top: 0;
+		opacity: 0;
+		visibility: hidden;
+
+		transition: all var(--animation-time);
+
+		height: fit-content;
+		overflow: hidden;
+
+		&.expanded {
+			margin-top: var(--padding);
+			opacity: 1;
+			visibility: initial;
+		}
+	}
+
+	.content {
+		// to respect children margins in contentHeight calculation
+		overflow: auto;
+
+		&:not(.wrapHeight) {
+			// to not stick the content to the bottom
+			padding-bottom: var(--padding);
+		}
+	}
+
+	.icon {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+	}
+}

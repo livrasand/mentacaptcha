@@ -1,0 +1,280 @@
+@use './shadow';
+@use './text';
+@use './grid';
+@use './media';
+@use './disabled';
+@use './a11y';
+
+@mixin primary {
+	outline: 0;
+	cursor: pointer;
+
+	user-select: none;
+
+	display: inline-flex;
+	justify-content: center;
+	align-items: center;
+
+	margin: var(--padding) 0;
+	padding: var(--padding);
+
+	width: fit-content;
+	height: fit-content;
+
+	text-decoration: none;
+
+	transition:
+		color 0.15s ease-out,
+		background 0.15s ease-out,
+		transform 0.15s ease-out,
+		box-shadow 0.25s ease-out,
+		border 0.15s ease-out;
+
+	background: var(--color-primary-opaque);
+	color: var(--color-primary-opaque-contrast);
+
+	border: 2px solid var(--color-primary-opaque-contrast);
+	border-radius: var(--border-radius);
+
+	box-shadow: 4px 4px var(--color-primary-opaque-contrast);
+
+	svg + span {
+		margin: 0 0 0 0.45rem;
+	}
+
+	&:disabled {
+		@include disabled.disabled;
+		pointer-events: none;
+	}
+
+	&:active {
+		box-shadow: none;
+		transform: translateX(3px) translateY(3px);
+	}
+
+	&:hover:not(:disabled),
+	&:focus:not(:disabled) {
+		background: var(--color-primary-opaque);
+		border-color: var(--color-primary-shade);
+		box-shadow: 4px 4px var(--color-primary-opaque-tint);
+	}
+
+	@include button-state;
+}
+
+@mixin menu {
+	width: 100%;
+	background: transparent;
+	box-shadow: none;
+	border: none;
+	margin: 0;
+	justify-content: flex-start;
+	padding: 0.25rem 0.75rem 0.25rem 0;
+	font-size: inherit;
+
+	svg {
+		margin: var(--padding) var(--padding);
+		width: var(--padding-2_5x);
+		height: var(--padding-2_5x);
+	}
+
+	&:hover:not(:disabled),
+	&:focus:not(:disabled) {
+		text-decoration: none;
+	}
+}
+
+@mixin square {
+	box-shadow: none;
+
+	border-radius: 50%;
+
+	height: calc(var(--padding-3x) + var(--padding-0_5x));
+	width: calc(var(--padding-3x) + var(--padding-0_5x));
+	aspect-ratio: 1 / 1;
+	padding: var(--padding-0_25x) calc(var(--padding-0_25x) * 3 / 2) var(--padding-0_25x)
+		var(--padding-0_25x);
+
+	margin: 0;
+
+	@include visually-hidden;
+}
+
+@mixin icon {
+	box-shadow: none;
+	border: none;
+	background: var(--color-background);
+	color: var(--color-background-contrast);
+	margin: 0;
+
+	@include button-state;
+
+	@include visually-hidden;
+}
+
+@mixin rounded {
+	border-radius: 50%;
+
+	border: 1px solid var(--text-color);
+
+	--button-icon-size: calc(var(--padding-4x) + var(--padding-0_5x));
+
+	width: var(--button-icon-size);
+	height: var(--button-icon-size);
+
+	padding: 0;
+
+	&.small {
+		--button-icon-size: calc(var(--padding-4x) - var(--padding-0_5x));
+	}
+}
+
+@mixin hidden {
+	display: none;
+}
+
+@mixin visually-hidden {
+	span {
+		width: 100%;
+		@include text.truncate;
+
+		&.visually-hidden {
+			@include a11y.visually-hidden;
+		}
+	}
+}
+
+@mixin text {
+	display: inline-flex;
+
+	padding: 0;
+	margin: var(--padding);
+
+	box-shadow: none;
+	border: 1px solid transparent;
+	background: transparent;
+
+	text-decoration: underline;
+	text-underline-offset: 0.1rem;
+
+	text-align: inherit;
+
+	&:hover,
+	&:focus {
+		background: transparent;
+		color: var(--color-primary);
+	}
+}
+
+@mixin article {
+	grid-column: span 12 / auto;
+
+	text-align: inherit;
+
+	padding: 0;
+
+	width: 100%;
+
+	@include shadow.strong-card-action;
+
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-start;
+	align-items: flex-start;
+
+	@include media.min-width(medium) {
+		grid-column: span 6 / auto;
+	}
+
+	@include media.min-width(large) {
+		grid-column: span 4 / auto;
+	}
+
+	&:hover:not(:disabled),
+	&:focus:not(:disabled) {
+		:global(.actions) {
+			background: var(--color-primary);
+			color: var(--color-primary-contrast);
+		}
+	}
+
+	&:active {
+		box-shadow: none;
+		transform: translateX(1px) translateY(1px);
+	}
+}
+
+@mixin button-state {
+	&.success {
+		background: var(--color-success);
+		color: var(--color-success-contrast);
+
+		&:hover:not(:disabled),
+		&:focus:not(:disabled) {
+			background: var(--color-success-shade);
+		}
+	}
+
+	&.error {
+		background: var(--color-error);
+		color: var(--color-error-contrast);
+
+		&:hover:not(:disabled),
+		&:focus:not(:disabled) {
+			background: var(--color-error-shade);
+		}
+	}
+
+	&.warning {
+		background: var(--color-warning);
+		color: var(--color-warning-contrast);
+
+		&:hover:not(:disabled),
+		&:focus:not(:disabled) {
+			background: var(--color-warning-shade);
+		}
+	}
+}
+
+@mixin badge {
+	box-shadow: none;
+
+	color: var(--color-card);
+	background: rgba(var(--color-card-contrast-rgb), 0.6);
+	border: 1px solid var(--color-card-contrast);
+
+	border-radius: var(--padding-2x);
+
+	margin: var(--padding-0_25x) 0;
+	padding: var(--padding-0_25x) var(--padding);
+
+	font-size: var(--font-size-very-small);
+
+	width: fit-content;
+
+	@include button-state;
+}
+
+@mixin badge-primary {
+	color: var(--color-primary-contrast);
+	background: rgba(var(--color-primary-rgb), 0.6);
+	border-color: var(--color-primary);
+}
+
+@mixin badge-secondary {
+	color: var(--color-secondary-contrast);
+	background: rgba(var(--color-secondary-rgb), 0.6);
+	border-color: var(--color-secondary);
+}
+
+@mixin badge-tertiary {
+	color: var(--color-tertiary-contrast);
+	background: rgba(var(--color-tertiary-rgb), 0.6);
+	border-color: var(--color-tertiary);
+}
+
+@mixin badge-primary-opaque {
+	color: var(--color-primary-opaque-contrast);
+	background: rgba(var(--color-primary-opaque-rgb), 0.6);
+	border-color: rgba(var(--color-primary-rgb), 0.2);
+}

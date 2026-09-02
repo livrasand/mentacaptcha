@@ -1,0 +1,73 @@
+@use '../mixins/button';
+
+button {
+	@include button.primary;
+
+	&.square {
+		@include button.square;
+	}
+
+	&.menu {
+		@include button.menu;
+	}
+
+	&.icon {
+		@include button.icon;
+	}
+
+	&.rounded {
+		@include button.rounded;
+	}
+
+	&.hidden {
+		@include button.hidden;
+	}
+
+	&.text {
+		@include button.text;
+	}
+
+	&.article {
+		@include button.article;
+	}
+
+	&.badge {
+		@include button.badge;
+	}
+
+	&.badge.primary {
+		@include button.badge-primary;
+	}
+
+	&.badge.secondary {
+		@include button.badge-secondary;
+	}
+
+	&.badge.tertiary {
+		@include button.badge-tertiary;
+	}
+
+	&.badge.primary-opaque {
+		@include button.badge-primary-opaque;
+	}
+}
+
+.badge {
+	@include button.badge;
+
+	&.primary {
+		@include button.badge-primary;
+	}
+
+	&.secondary {
+		@include button.badge-secondary;
+	}
+
+	&.tertiary {
+		@include button.badge-tertiary;
+	}
+
+	&.primary-opaque {
+		@include button.badge-primary-opaque;
+	}
+}

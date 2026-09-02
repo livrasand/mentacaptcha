@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Documentation: Menta</title>
+<link rel="icon" type="image/svg+xml" href="/menta-logo.svg">
+<link rel="stylesheet" href="/css/global.css">
+<script src="/js/header.js" defer></script>
+</head>
+<body>
+
+{% include 'nav.html' %}
+
+<div class="container" style="padding: var(--padding-12x) var(--padding-6x) var(--padding-12x); max-width: 900px; margin: 0 auto;">
+
+<h1 style="margin-bottom: var(--padding-8x); text-align: center;">Documentation</h1>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Quick Start</h2>
+  <p style="margin-bottom: var(--padding-4x);">Add Menta to your page in two lines:</p>
+  <pre style="background: var(--color-body); padding: var(--padding-4x); border-radius: var(--border-radius); overflow-x: auto; margin-bottom: var(--padding-4x);"><code>&lt;script src="https://your-domain.com/menta-captcha.js"&gt;&lt;/script&gt;
+&lt;menta-widget data-cap-api-endpoint="https://your-domain.com"&gt;&lt;/menta-widget&gt;</code></pre>
+  <p style="color: var(--value-color);">The widget automatically initializes and handles the challenge flow.</p>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-6x);">Configuration</h2>
+  
+  <h3 style="margin-bottom: var(--padding-4x); margin-top: var(--padding-6x);">Theme</h3>
+  <p style="margin-bottom: var(--padding-3x);">Set <code style="display: inline; padding: 2px 8px;">data-cap-theme</code> to control appearance:</p>
+  <ul style="padding-left: var(--padding-6x); margin-bottom: var(--padding-4x);">
+    <li style="margin-bottom: var(--padding-2x);"><code>light</code> — Default light theme</li>
+    <li style="margin-bottom: var(--padding-2x);"><code>dark</code> — Dark theme</li>
+    <li style="margin-bottom: var(--padding-2x);"><code>auto</code> — Follows OS preference</li>
+  </ul>
+  <pre style="background: var(--color-body); padding: var(--padding-4x); border-radius: var(--border-radius); overflow-x: auto;"><code>&lt;menta-widget data-cap-api-endpoint="/" data-cap-theme="dark"&gt;&lt;/menta-widget&gt;</code></pre>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h3 style="margin-bottom: var(--padding-4x); margin-top: var(--padding-6x);">Layout &amp; Appearance</h3>
+  <div class="table-container" style="margin-bottom: var(--padding-4x);">
+    <table>
+      <thead>
+        <tr><th>Attribute</th><th>Description</th><th>Default</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>data-cap-width</td><td>Widget width</td><td><code>300px</code></td></tr>
+        <tr><td>data-cap-height</td><td>Widget height</td><td><code>70px</code></td></tr>
+        <tr><td>data-cap-padding</td><td>Inner padding</td><td><code>0 15px</code></td></tr>
+        <tr><td>data-cap-background</td><td>Background color</td><td><code>#fff</code> / <code>#212121</code></td></tr>
+        <tr><td>data-cap-border-color</td><td>Border color</td><td><code>#e0e0e0</code> / <code>#424242</code></td></tr>
+        <tr><td>data-cap-border-radius</td><td>Corner radius</td><td><code>20px</code></td></tr>
+        <tr><td>data-cap-box-shadow</td><td>Box shadow</td><td><code>0 2px 4px rgba(0,0,0,0.05)</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h3 style="margin-bottom: var(--padding-4x); margin-top: var(--padding-6x);">Typography</h3>
+  <div class="table-container" style="margin-bottom: var(--padding-4x);">
+    <table>
+      <thead>
+        <tr><th>Attribute</th><th>Description</th><th>Default</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>data-cap-font-family</td><td>Font stack</td><td>System sans-serif</td></tr>
+        <tr><td>data-cap-font-size</td><td>Label font size</td><td><code>16px</code></td></tr>
+        <tr><td>data-cap-font-weight</td><td>Label font weight</td><td><code>400</code></td></tr>
+        <tr><td>data-cap-text-color</td><td>Label color</td><td><code>#333</code> / <code>#e6e6e6</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h3 style="margin-bottom: var(--padding-4x); margin-top: var(--padding-6x);">Colors &amp; Accent</h3>
+  <div class="table-container" style="margin-bottom: var(--padding-4x);">
+    <table>
+      <thead>
+        <tr><th>Attribute</th><th>Description</th><th>Default</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>data-cap-primary-color</td><td>Brand color</td><td><code>#22C55E</code></td></tr>
+        <tr><td>data-cap-checkmark-color</td><td>Checkmark color</td><td>Same as primary</td></tr>
+        <tr><td>data-cap-brand-color</td><td>"Brand link color</td><td><code>#757575</code></td></tr>
+        <tr><td>data-cap-link-color</td><td>Link color</td><td><code>#757575</code></td></tr>
+        <tr><td>data-cap-spinner-color</td><td>Spinner color</td><td><code>#757575</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h3 style="margin-bottom: var(--padding-4x); margin-top: var(--padding-6x);">Internationalization</h3>
+  <p style="margin-bottom: var(--padding-3x);">Customize all widget text:</p>
+  <div class="table-container" style="margin-bottom: var(--padding-4x);">
+    <table>
+      <thead>
+        <tr><th>Attribute</th><th>Default Text</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>data-cap-i18n-initial-state</td><td>"I'm not a robot"</td></tr>
+        <tr><td>data-cap-i18n-loading</td><td>"Loading..."</td></tr>
+        <tr><td>data-cap-i18n-verifying</td><td>"Verifying..."</td></tr>
+        <tr><td>data-cap-i18n-success</td><td>"Verified"</td></tr>
+        <tr><td>data-cap-i18n-error</td><td>"Error. Try again."</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h3 style="margin-bottom: var(--padding-4x); margin-top: var(--padding-6x);">Custom CSS</h3>
+  <p style="margin-bottom: var(--padding-3x);">Pass raw CSS for fine-grained control:</p>
+  <pre style="background: var(--color-body); padding: var(--padding-4x); border-radius: var(--border-radius); overflow-x: auto;"><code>&lt;menta-widget
+  data-cap-api-endpoint="/"
+  data-cap-css=".container { transition: all .2s ease; }"&gt;&lt;/menta-widget&gt;</code></pre>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Full Example</h2>
+  <pre style="background: var(--color-body); padding: var(--padding-4x); border-radius: var(--border-radius); overflow-x: auto;"><code>&lt;menta-widget
+  data-cap-api-endpoint="https://your-domain.com"
+  data-cap-i18n-initial-state="I'm not a robot"
+  data-cap-theme="dark"
+  data-cap-width="340px"
+  data-cap-height="64px"
+  data-cap-border-radius="12px"
+  data-cap-border-color="#22C55E"
+  data-cap-primary-color="#22C55E"
+  data-cap-background="#121212"
+  data-cap-text-color="#f0f0f0"
+  data-cap-font-family="'Inter', sans-serif"
+  data-cap-font-size="15px"
+  data-cap-checkbox-size="26px"
+  data-cap-box-shadow="0 4px 12px rgba(0,0,0,0.5)"&gt;&lt;/menta-widget&gt;</code></pre>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Backend Integration</h2>
+  <p style="margin-bottom: var(--padding-4x);">Verify tokens on your backend:</p>
+  <pre style="background: var(--color-body); padding: var(--padding-4x); border-radius: var(--border-radius); overflow-x: auto;"><code>POST /verify
+Content-Type: application/json
+
+{
+  "token": "eyJhbGciOiJIUzI1NiIs..."
+}
+
+Response:
+{
+  "valid": true,
+  "tenant_id": "your-tenant"
+}</code></pre>
+</div>
+
+<div style="text-align: center; margin-top: var(--padding-12x);">
+  <a href="/how-it-works" class="button" style="margin-right: var(--padding-4x);">How It Works</a>
+  <a href="/demo" class="button">Try Demo</a>
+</div>
+
+</div>
+
+{% include 'footer.html' %}
+
+</body>
+</html>

@@ -1,0 +1,31 @@
+@use '../mixins/overlay';
+
+.popover {
+	&:not(.dark) {
+		@include overlay.popover;
+	}
+
+	&.dark {
+		@include overlay.popover(dark);
+	}
+
+	&.center {
+		--popover-min-size: 300px;
+
+		&.wide {
+			--popover-min-size: 540px;
+		}
+	}
+}
+
+.popover-apply {
+	button.icon {
+		padding: 0;
+	}
+
+	@include overlay.popover-container;
+
+	.apply {
+		margin: var(--padding-1_5x) 0 var(--padding);
+	}
+}

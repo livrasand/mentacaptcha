@@ -3,150 +3,164 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Privacy-First Captcha and Bot Protection: Menta</title>
+<title>Privacy-First CAPTCHA: Menta</title>
 <link rel="icon" type="image/svg+xml" href="/menta-logo.svg">
-<style>
-  :root { --menta: #22C55E; }
-  body { font-family: "Courier New", monospace; margin: 0; padding: 2rem 0; background: #fff; color: #000; }
-  .container { max-width: 1000px; margin: 0 auto; padding: 0 1rem; }
-  h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
-  hr { border: none; border-top: 2px solid #000; margin: 1rem 0; }
-  p { max-width: 48rem; line-height: 1.6; margin-bottom: 1.25rem; }
-  .nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.5rem; }
-  .nav .links { margin: 0; }
-  ul { list-style: none; padding: 0; margin-bottom: 1rem; }
-  li { margin-bottom: 0.75rem; line-height: 1.5; }
-  .tag { display: inline-block; width: 4rem; font-weight: 700; }
-  .post { color: #000; }
-  .path { font-family: "Courier New", monospace; }
-  .desc { color: #555; }
-  a { color: #000; }
-  a:hover { background: #000; color: #fff; }
-  pre { background: #f0f0f0; padding: 1rem; overflow-x: auto; font-family: "Courier New", monospace; margin: 1rem 0; }
-  h2 { font-size: 2rem; font-weight: 700; letter-spacing: -0.05em; margin-top: 2.5rem; margin-bottom: 1rem; }
-  h3 { font-size: 1.1rem; margin-top: 1.5rem; margin-bottom: 0.75rem; }
-  .badge {
-    display: inline-block;
-    padding: 0.2rem 0.5rem;
-    border: 1px solid #000;
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    margin-right: 0.5rem;
-    vertical-align: middle;
-  }
-  .cta {
-    display: inline-block;
-    background: var(--menta);
-    color: #000;
-    padding: 0.5rem 1rem;
-    border: 1px solid var(--menta);
-    text-decoration: none;
-  }
-  .cta:hover { filter: brightness(0.95); }
-  button:hover { background: var(--menta); color: #000; }
-  .hero { display: flex; align-items: center; gap: 1.5rem; margin: 1rem 0; }
-  .hero-text { flex: 1; }
-  .hero-media { flex: 1; }
-  .hero-media img { max-width: 100%; height: auto; display: block; }
-  @media (max-width: 768px) { .hero { flex-direction: column; } }
-  .footer { margin-top: 2rem; color: #999; font-size: 0.8rem; }
-</style>
+<link rel="stylesheet" href="/css/global.css">
+<script src="/js/header.js" defer></script>
 </head>
 <body>
-{% include 'nav.html' %}
-<div class="container">
 
-<div class="hero">
-  <div class="hero-text">
-    <p><strong>Self-hosted CAPTCHA for the modern web.</strong> No Google. No telemetry. No visual puzzles.</p>
-    <p>Menta replaces image-based challenges with a lightweight proof-of-work check. Users click once; your server verifies the rest. Try our hosted SaaS free for 45 days, or run it yourself at zero cost.</p>
-  </div>
-  <div class="hero-media">
-    <img src="/menta-in-action.gif" alt="Menta in action" width="400">
+{% include 'nav.html' %}
+
+<div class="container" style="padding: var(--padding-12x) var(--padding-6x) var(--padding-12x); max-width: 900px; margin: 0 auto;">
+
+<div class="card-container" style="margin-bottom: var(--padding-12x); padding: var(--padding-8x);">
+  <div style="text-align: center;">
+    <h1 style="font-size: 2.5rem; margin-bottom: var(--padding-6x); font-weight: 800;">Privacy-first bot protection</h1>
+    <p style="font-size: 1.2rem; color: var(--value-color); margin-bottom: var(--padding-8x); max-width: 600px; margin-left: auto; margin-right: auto;">Self-hosted CAPTCHA with zero telemetry. No Google. No cookies. No visual puzzles. Just proof-of-work.</p>
+    <div style="display: flex; gap: var(--padding-4x); justify-content: center; flex-wrap: wrap;">
+      <a href="/demo" class="button" style="padding: var(--padding-3x) var(--padding-6x); font-size: 1.1rem;">Try Demo</a>
+      <a href="/pricing" class="button" style="padding: var(--padding-3x) var(--padding-6x); font-size: 1.1rem;">View Pricing</a>
+    </div>
   </div>
 </div>
 
-<h2>What is Menta?</h2>
-<p>Menta is a privacy-first, self-hosted CAPTCHA that runs entirely on your own infrastructure. It uses a hashcash-style proof-of-work challenge to tell humans and bots apart — no third-party scripts, no cookies, no fingerprinting, and no pictures to identify.</p>
-<p>Built for developers who want simple bot protection without shipping their users' traffic to a closed service.</p>
-<p><span class="badge">[ FREE ]</span> <strong>Self-hosted is 100% free</strong> — no hidden fees, no limits, no strings attached. <a href="/pricing">SaaS plans</a> start at $1/month and include a 45-day free trial, manual crypto activation, and a domain-protection system that keeps every account tied to its real owner.</p>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--padding-8x); margin-bottom: var(--padding-12x);">
+  <div class="card-container" style="padding: var(--padding-6x);">
+    <h3 style="margin-bottom: var(--padding-4x);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+<g clip-path="url(#clip0_4418_9520)">
+<path d="M6 10V8C6 4.69 7 2 12 2C17 2 18 4.69 18 8V10" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M17 22H7C3 22 2 21 2 17V15C2 11 3 10 7 10H17C21 10 22 11 22 15V17C22 21 21 22 17 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M15.9965 16H16.0054" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M11.9955 16H12.0045" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M7.99451 16H8.00349" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+</g>
+<defs>
+<clipPath id="clip0_4418_9520">
+<rect width="24" height="24" fill="white"/>
+</clipPath>
+</defs>
+</svg> Strict No-Logs Policy</h3>
+    <p style="color: var(--value-color);">We never log challenge activity or connection data on our infrastructure. No sign-up required to use the self-hosted version.</p>
+  </div>
+  <div class="card-container" style="padding: var(--padding-6x);">
+    <h3 style="margin-bottom: var(--padding-4x);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+<g clip-path="url(#clip0_4418_10164)">
+<path d="M9 8.38086H13.6846C14.7231 8.38086 15.5654 9.31548 15.5654 10.2616C15.5654 11.3001 14.7231 12.1424 13.6846 12.1424H9V8.38086Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M9 12.1309H14.3539C15.5423 12.1309 16.5 12.9732 16.5 14.0116C16.5 15.0501 15.5423 15.8924 14.3539 15.8924H9V12.1309Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M12.277 15.8809V17.7616" stroke="var(--color-primary)" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M9.93457 15.8809V17.7616" stroke="var(--color-primary)" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M12.277 6.5V8.38077" stroke="var(--color-primary)" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M9.93457 6.5V8.38077" stroke="var(--color-primary)" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M10.7769 8.38086H7.5" stroke="var(--color-primary)" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M10.7769 15.8809H7.5" stroke="var(--color-primary)" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-miterlimit="10" />
+</g>
+<defs>
+<clipPath id="clip0_4418_10164">
+<rect width="24" height="24" fill="white"/>
+</clipPath>
+</defs>
+</svg> Anonymous Crypto Payments</h3>
+    <p style="color: var(--value-color);">Pay with Bitcoin, Monero &amp; Zcash on SaaS plans, or self-host the full source for free.</p>
+  </div>
+  <div class="card-container" style="padding: var(--padding-6x);">
+    <h3 style="margin-bottom: var(--padding-4x);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+<g clip-path="url(#clip0_4418_9795)">
+<path d="M14.9 2H9.10001C8.42001 2 7.46 2.4 6.98 2.88L2.88 6.98001C2.4 7.46001 2 8.42001 2 9.10001V14.9C2 15.58 2.4 16.54 2.88 17.02L6.98 21.12C7.46 21.6 8.42001 22 9.10001 22H14.9C15.58 22 16.54 21.6 17.02 21.12L21.12 17.02C21.6 16.54 22 15.58 22 14.9V9.10001C22 8.42001 21.6 7.46001 21.12 6.98001L17.02 2.88C16.54 2.4 15.58 2 14.9 2Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M8.5 15.5L15.5 8.5" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M15.5 15.5L8.5 8.5" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+</g>
+<defs>
+<clipPath id="clip0_4418_9795">
+<rect width="24" height="24" fill="white"/>
+</clipPath>
+</defs>
+</svg> No Tracking, No Cookies</h3>
+    <p style="color: var(--value-color);">No cookies, no fingerprints, no third-party scripts. IP addresses truncated by default.</p>
+  </div>
+  <div class="card-container" style="padding: var(--padding-6x);">
+    <h3 style="margin-bottom: var(--padding-4x);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+<g clip-path="url(#clip0_655_7205)">
+<path d="M22.0004 8.47V3C22.0004 2.45 21.5504 2 21.0004 2H15.5304C14.6404 2 14.1904 3.08 14.8204 3.71L20.2904 9.18C20.9204 9.81 22.0004 9.36 22.0004 8.47Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M15.3404 4.35L7.09035 12.6C6.70035 12.99 6.70035 13.62 7.09035 14.01L9.92035 16.84C10.3104 17.23 10.9404 17.23 11.3304 16.84L19.5804 8.59L15.3404 4.35Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M8.56 15.44L2 22" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+</g>
+<defs>
+<clipPath id="clip0_655_7205">
+<rect width="24" height="24" fill="white"/>
+</clipPath>
+</defs>
+</svg> Instant Activation</h3>
+    <p style="color: var(--value-color);">Drop the script tag and protection works the moment a request hits your endpoint. No waiting, no approvals.</p>
+  </div>
+  <div class="card-container" style="padding: var(--padding-6x);">
+    <h3 style="margin-bottom: var(--padding-4x);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+<g clip-path="url(#clip0_4418_169846)">
+<path d="M3.92969 15.8797L15.8797 3.92969" stroke="var(--color-primary)" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M11.1013 18.2791L12.3013 17.0791" stroke="var(--color-primary)" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M13.793 15.5892L16.183 13.1992" stroke="var(--color-primary)" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M3.60127 10.2395L10.2413 3.59949C12.3613 1.47949 13.4213 1.46949 15.5213 3.56949L20.4313 8.47949C22.5313 10.5795 22.5213 11.6395 20.4013 13.7595L13.7613 20.3995C11.6413 22.5195 10.5813 22.5295 8.48127 20.4295L3.57127 15.5195C1.47127 13.4195 1.47127 12.3695 3.60127 10.2395Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M2 21.998H22" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+</g>
+<defs>
+<clipPath id="clip0_4418_169846">
+<rect width="24" height="24" fill="white"/>
+</clipPath>
+</defs>
+</svg> Flexible Plans</h3>
+    <p style="color: var(--value-color);">Monthly, or yearly SaaS plans, plus the always-free self-host path for full ownership.</p>
+  </div>
+  <div class="card-container" style="padding: var(--padding-6x);">
+    <h3 style="margin-bottom: var(--padding-4x);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+<g clip-path="url(#clip0_4418_9448)">
+<path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M7.99998 3H8.99998C7.04998 8.84 7.04998 15.16 8.99998 21H7.99998" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M15 3C16.95 8.84 16.95 15.16 15 21" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M3 16V15C8.84 16.95 15.16 16.95 21 15V16" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M3 8.99961C8.84 7.04961 15.16 7.04961 21 8.99961" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+</g>
+<defs>
+<clipPath id="clip0_4418_9448">
+<rect width="24" height="24" fill="white"/>
+</clipPath>
+</defs>
+</svg> Self-Host Anywhere</h3>
+    <p style="color: var(--value-color);">Run on your own server, your VPS, or your edge runtime. Full source, zero third-party dependencies.</p>
+  </div>
+</div>
 
-<h2>Why does it exist?</h2>
-<p>Menta was born from the need to protect forms and APIs from bots without surrendering visitor data to a third party. Most CAPTCHA services force users to identify traffic lights, train machine-learning models, or hand over fingerprints to a cloud vendor. Menta is a small, open-source, self-hosted alternative: you run it on your own server, your backend verifies the token, and your users' data stays between you and them.</p>
+<div style="text-align: center; margin-bottom: var(--padding-12x);">
+  <h2 style="margin-bottom: var(--padding-6x);">How it works</h2>
+  <div style="max-width: 600px; margin: 0 auto;">
+    <div style="margin-bottom: var(--padding-6x);">
+      <h4 style="margin-bottom: var(--padding-2x);">1. Challenge</h4>
+      <p style="color: var(--value-color);">Server creates a unique challenge with a random salt and target difficulty.</p>
+    </div>
+    <div style="margin-bottom: var(--padding-6x);">
+      <h4 style="margin-bottom: var(--padding-2x);">2. Solve</h4>
+      <p style="color: var(--value-color);">Client finds a nonce that makes SHA-256(salt + nonce) meet the target.</p>
+    </div>
+    <div style="margin-bottom: var(--padding-6x);">
+      <h4 style="margin-bottom: var(--padding-2x);">3. Verify</h4>
+      <p style="color: var(--value-color);">Server verifies the proof and issues a signed session token.</p>
+    </div>
+  </div>
+  <a href="/how-it-works" class="button" style="margin-top: var(--padding-4x);">Learn more</a>
+</div>
 
-<h2>How it works</h2>
-<p>Menta runs 8 main validation checks across the <code>/init</code>, <code>/challenge</code> and <code>/redeem</code> endpoints:</p>
-<ol>
-  <li><strong>Rate limit per IP and endpoint.</strong> Prevents brute-force requests from a single address.</li>
-  <li><strong>Bot signal checks.</strong> Flags traffic patterns that look automated.</li>
-  <li><strong>Session validity.</strong> Verifies the session exists, has not expired, has not been reused, and matches the original IP.</li>
-  <li><strong>Session signature.</strong> HMAC check proves the session was created by this server.</li>
-  <li><strong>Challenge signature.</strong> HMAC check proves the challenge was created by this server.</li>
-  <li><strong>Nonce entropy.</strong> Ensures the nonce is not a trivial or precomputed value.</li>
-  <li><strong>Proof-of-work.</strong> <code>SHA-256(salt + nonce)</code> must meet the current target difficulty.</li>
-  <li><strong>Client pattern.</strong> Solve time is analyzed against a normal human range to catch scripted shortcuts.</li>
-</ol>
+<div style="text-align: center; padding: var(--padding-8x); border-top: 1px solid var(--color-background-shade);">
+  <h2 style="margin-bottom: var(--padding-4x);">Ready to get started?</h2>
+  <p style="color: var(--value-color); margin-bottom: var(--padding-6x);">45-day free trial. No credit card required.</p>
+  <div style="display: flex; gap: var(--padding-4x); justify-content: center; flex-wrap: wrap;">
+    <a href="/account" class="button" style="padding: var(--padding-3x) var(--padding-6x);">Create Account</a>
+    <a href="https://github.com/livrasand/mentacaptcha" class="button" style="padding: var(--padding-3x) var(--padding-6x);">Self-host (Free)</a>
+  </div>
+</div>
 
-<h2>Why Menta?</h2>
-<ul>
-  <li><strong>Zero third-party telemetry.</strong> No requests to Google, Cloudflare or hCaptcha. Visitor data stays on your server.</li>
-  <li><strong>Private by design.</strong> No email, no cookies, no fingerprints. Support is anonymous and ntfy notifications are optional.</li>
-  <li><strong>No visual puzzles.</strong> Proof-of-work runs silently. Users click once and continue.</li>
-  <li><strong>Lightweight & dependency-free.</strong> One small JavaScript file. No external libraries or iframes.</li>
-  <li><strong>Self-hosted & free at scale.</strong> No quotas, no per-request fees, no vendor lock-in.</li>
-  <li><strong>Adaptive difficulty.</strong> Adjusts the target based on recent failures and solve patterns.</li>
-  <li><strong>Domain-protected accounts.</strong> Every SaaS account is tied to its domain, preventing abuse and keeping the system fair for everyone.</li>
-  <li><strong>Anonymous support.</strong> Open a ticket with a secret link; no account or personal data required.</li>
-  <li><strong>Admin dashboard.</strong> Track solves, failures, bot-flagged IPs and active sessions.</li>
-  <li><strong>Subject rights.</strong> Export and delete endpoints for data subject requests.</li>
-</ul>
-
-<h2>Why Menta is different</h2>
-<p>Menta is not a clone of reCAPTCHA or the big alternatives. It is a small, solo project built with one goal in mind: giving you full control over how your users are protected. I created Menta because I wanted to know exactly what happens to visitor data — no third-party scripts, no fingerprints, no black boxes, no surprises.</p>
-<p>If Menta makes sense for you, you can use it for free by self-hosting, or support the project through the SaaS mode. The SaaS price is symbolic: it helps keep Menta free, open-source and accessible to more developers who care about privacy as much as you do.</p>
-
-<h2>Privacy &amp; compliance</h2>
-<p>Menta is built with privacy-by-design principles, not as a legal certification. The technical foundation supports strong data protection, but formal compliance depends on your deployment, jurisdiction and legal process.</p>
-<ul>
-  <li><strong>Data minimization.</strong> IPs are truncated to /24 (IPv4) or /64 (IPv6) by default. No cookies, no fingerprinting, no third-party telemetry.</li>
-  <li><strong>Retention and cleanup.</strong> Configurable data-retention window with automatic cleanup of rate limits, solved challenges, failed attempts and support tickets.</li>
-  <li><strong>Subject rights.</strong> Export and delete endpoints for data subject requests.</li>
-  <li><strong>Encryption at rest.</strong> Optional SQLCipher encryption when <code>DB_ENCRYPTION_KEY</code> is set.</li>
-  <li><strong>Accessibility.</strong> ARIA labels, keyboard support, live regions and focus management as a baseline.</li>
-  <li><strong>Internationalization.</strong> Widget text is fully configurable, so integrators can provide their own translations.</li>
-</ul>
-<p>Our <a href="/privacy">Privacy</a>, <a href="/terms">Terms</a>, <a href="/dpa">DPA</a> and <a href="/baa">BAA</a> pages are standard templates. They are not a signed legal agreement or formal certification for GDPR, CCPA, LGPD, PIPEDA, DPDPA, HIPAA or PIPL. If your use case requires a specific compliance claim, review the documents with your legal counsel.</p>
-
-<h2>Get started</h2>
-<p>You have three ways to use Menta:</p>
-
-<h3>Option 1: Use the hosted widget (SaaS)</h3>
-<p>Add the script and the <code>&lt;menta-widget&gt;</code> tag to your page. Every new SaaS account gets a 45-day free trial; after that, activate with a simple manual crypto verification.</p>
-<pre><code>&lt;script src="https://mentacaptchaeu.eu.pythonanywhere.com/menta-captcha.js"&gt;&lt;/script&gt;
-
-&lt;menta-widget data-cap-api-endpoint="https://mentacaptchaeu.eu.pythonanywhere.com" data-cap-i18n-initial-state="I'm not a robot"&gt;&lt;/menta-widget&gt;</code></pre>
-<p><a class="cta" href="/pricing">See SaaS pricing</a> &middot; <a href="/support">Get help</a></p>
-
-<h3>Option 2: Self-host</h3>
-<p>Deploy the backend on any server that supports Python, such as <a href="https://www.pythonanywhere.com/">PythonAnywhere</a> or your own VPS. Self-hosted Menta is completely free — no hidden fees, no feature limits, no telemetry.</p>
-
-<h3>Option 3: Protect any page with Menta Shield</h3>
-<p><strong>No captcha widget, no domain registration.</strong> If you just want to keep bots away from a page, add one script tag. Menta Shield silently checks every visitor against the bot shield (known AI/SEO crawlers verified by IP ranges or reverse-DNS, robots.txt compliance, generic script user-agents) and decides:</p>
-<ul>
-  <li><strong>Verified bots that disobey your robots.txt</strong> → blocked with an access-denied screen.</li>
-  <li><strong>Suspicious clients</strong> (curl, python-requests, headless browsers, bot impersonators) → silently solve an invisible proof-of-work challenge before the page is revealed.</li>
-  <li><strong>Everyone else</strong> → pass through with no visible challenge at all.</li>
-</ul>
-<pre><code>&lt;script src="https://mentacaptchaeu.eu.pythonanywhere.com/menta-shield.js"
-        data-menta-api="https://mentacaptchaeu.eu.pythonanywhere.com"&gt;&lt;/script&gt;</code></pre>
-<p>The clearance is cached for 24 hours, so returning visitors are not re-checked. Optional attributes: <code>data-menta-hide-until-pass="true"</code> blurs the page content until verification completes, <code>data-menta-ttl</code> sets the cache duration in seconds, and <code>data-menta-i18n-blocked-title</code>, <code>data-menta-i18n-blocked-detail</code> and <code>data-menta-i18n-checking</code> let you customize the messages. Your backend can also validate the clearance server-to-server via <code>POST /shield/verify</code>.</p>
-
-<style>
-  .get { color: #000; }
-</style>
+</div>
 
 {% include 'footer.html' %}
-</div>
+
 </body>
 </html>

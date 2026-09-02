@@ -1,0 +1,9 @@
+.form-key {
+	display: flex;
+	align-items: center;
+	gap: var(--padding-2x);
+
+	button {
+		margin: var(--padding) 0 var(--padding-2x);
+	}
+}

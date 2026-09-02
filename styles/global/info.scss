@@ -1,0 +1,26 @@
+.info {
+	display: flex;
+	align-items: center;
+	gap: var(--padding-2x);
+
+	padding: var(--padding-2x);
+	margin: var(--warning-margin, 0 0 var(--padding-4x));
+
+	background: var(--color-tertiary);
+	color: var(--color-tertiary-contrast);
+
+	a:hover,
+	a:active {
+		color: var(--color-secondary);
+	}
+
+	.icon {
+		display: inline-flex;
+		width: 32px;
+		flex: 0 0 auto;
+	}
+
+	svg {
+		display: block;
+	}
+}

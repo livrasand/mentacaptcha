@@ -3,159 +3,174 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Plans and pricing: Menta</title>
+<title>Pricing: Menta</title>
 <link rel="icon" type="image/svg+xml" href="/menta-logo.svg">
-<style>
-  :root { --menta: #22C55E; }
-  body { font-family: "Courier New", monospace; margin: 0; padding: 2rem 0; background: #fff; color: #000; }
-  .container { max-width: 1000px; margin: 0 auto; padding: 0 1rem; }
-  p { max-width: 48rem; line-height: 1.6; margin-bottom: 1.25rem; }
-  h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
-  hr { border: none; border-top: 2px solid #000; margin: 1rem 0; }
-  .nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.5rem; }
-  .nav .links { margin: 0; }
-  a { color: #000; }
-  a:hover { background: #000; color: #fff; }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 1rem;
-    margin: 1.5rem 0;
-  }
-  .card {
-    border: 2px solid #000;
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
-  }
-  .card:hover { transform: translate(-4px, -4px); box-shadow: 4px 4px 0px 0px #000; border-color: var(--menta); }
-  .card.featured {
-    border: 3px solid #000;
-    background: #dcfce7;
-  }
-  .recommended {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid #000;
-    background: #000;
-    color: #fff;
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-  }
-  .card h3 {
-    margin: 0 0 0.5rem;
-    font-size: 1.2rem;
-  }
-  .card .price {
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0.5rem 0;
-  }
-  .card .period {
-    color: #555;
-    font-size: 0.9rem;
-  }
-  .card ul {
-    list-style: disc;
-    padding-left: 1.2rem;
-    flex: 1;
-  }
-  .card li {
-    margin-bottom: 0.5rem;
-  }
-  .tag {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid #000;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-  }
-  .badge {
-    display: inline-block;
-    padding: 0.2rem 0.5rem;
-    border: 1px solid #000;
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    margin-right: 0.5rem;
-    vertical-align: middle;
-  }
-  .cta {
-    display: inline-block;
-    background: var(--menta);
-    color: #000;
-    padding: 0.5rem 1rem;
-    border: 1px solid var(--menta);
-    text-decoration: none;
-  }
-  .cta:hover { filter: brightness(0.95); }
-  .footer { margin-top: 2rem; color: #999; font-size: 0.8rem; }
-</style>
+<link rel="stylesheet" href="/css/global.css">
+<script src="/js/header.js" defer></script>
 </head>
 <body>
 
 {% include 'nav.html' %}
-<div class="container">
 
-<p><span class="badge">[ FREE ]</span> <span class="badge">[ OPEN SOURCE ]</span> <strong>Self-hosted Menta is 100% free.</strong> No hidden fees, no feature limits, no telemetry. Run it on your own server and keep full control of your data and your users.</p>
+<div class="container" style="padding: var(--padding-12x) var(--padding-6x) var(--padding-12x); max-width: 1000px; margin: 0 auto;">
 
-<p><strong>SaaS pricing is symbolic.</strong> Menta is built by one developer and will always be free to self-host. The SaaS plans cover hosting and TLS, but more importantly they say: "I support free software and I want more developers to have access to tools like Menta." If you prefer, you can self-host for $0 or support the project on <a href="https://github.com/sponsors/livrasand" target="_blank">GitHub Sponsors</a>.</p>
+<h1 style="margin-bottom: var(--padding-4x); text-align: center;">Pricing</h1>
+<p style="text-align: center; color: var(--value-color); margin-bottom: var(--padding-12x); font-size: 1.1rem;">Self-hosted is always free. SaaS plans support the project.</p>
 
-<div class="grid">
-  <div class="card">
-    <span class="tag">Beginner</span>
-    <h3>Beginner</h3>
-    <div class="price">$1<small>/month</small></div>
-    <div class="period">or $10/year (2 months free)</div>
-    <ul>
-      <li>1 allowed domain</li>
-      <li>Unlimited CAPTCHA challenges</li>
-      <li>Standard difficulty</li>
-      <li>Symbolic support for free software</li>
-    </ul>
-    <p><a class="cta" href="/dashboard#account">Get started &rarr;</a></p>
+<div class="grid" style="margin-bottom: var(--padding-12x); gap: var(--padding-6x); display: grid; grid-template-columns: repeat(3, 1fr);">
+  <div class="card-container with-title" style="padding: 0;">
+    <div class="title" style="padding: var(--padding-4x) var(--padding-6x);">Beginner</div>
+    <div style="padding: var(--padding-6x);">
+      <div style="font-size: 2.5rem; font-weight: 800; margin: var(--padding-4x) 0;">$1<span style="font-size: 1rem; font-weight: 400; color: var(--value-color);">/month</span></div>
+      <p style="color: var(--value-color); margin-bottom: var(--padding-6x);">or $10/year (2 months free)</p>
+      <ul style="list-style: none; padding: 0; margin-bottom: var(--padding-6x);">
+        <li style="margin-bottom: var(--padding-3x); display: flex; align-items: flex-start; gap: var(--padding-2x);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 2px;">
+            <path d="M12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7.75 11.9999L10.58 14.8299L16.25 9.16992" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>1 allowed domain</span>
+        </li>
+        <li style="margin-bottom: var(--padding-3x); display: flex; align-items: flex-start; gap: var(--padding-2x);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 2px;">
+            <path d="M12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7.75 11.9999L10.58 14.8299L16.25 9.16992" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>Unlimited CAPTCHA challenges</span>
+        </li>
+        <li style="margin-bottom: var(--padding-3x); display: flex; align-items: flex-start; gap: var(--padding-2x);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 2px;">
+            <path d="M12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7.75 11.9999L10.58 14.8299L16.25 9.16992" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>Standard difficulty</span>
+        </li>
+        <li style="margin-bottom: var(--padding-3x); display: flex; align-items: flex-start; gap: var(--padding-2x);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 2px;">
+            <path d="M12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7.75 11.9999L10.58 14.8299L16.25 9.16992" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>Symbolic support for free software</span>
+        </li>
+      </ul>
+      <a href="/account" class="button" style="width: 100%; text-align: center;">Get started</a>
+    </div>
   </div>
 
-  <div class="card featured">
-    <span class="recommended">[ RECOMMENDED ]</span>
-    <span class="tag">Developer</span>
-    <h3>Developer</h3>
-    <div class="price">$5<small>/month</small></div>
-    <div class="period">or $40/year (4 months free)</div>
-    <ul>
-      <li><strong>Unlimited</strong> allowed domains</li>
-      <li>Unlimited CAPTCHA challenges</li>
-      <li>Adaptive difficulty</li>
-      <li>Priority support</li>
-      <li>Symbolic support for free software</li>
-    </ul>
-    <p><a class="cta" href="/dashboard#account">Get started &rarr;</a></p>
+  <div class="card-container with-title primary" style="padding: 0;">
+    <div class="title" style="padding: var(--padding-4x) var(--padding-6x);">Developer</div>
+    <div style="padding: var(--padding-6x);">
+      <div style="font-size: 2.5rem; font-weight: 800; margin: var(--padding-4x) 0;">$5<span style="font-size: 1rem; font-weight: 400; color: var(--value-color);">/month</span></div>
+      <p style="color: var(--value-color); margin-bottom: var(--padding-6x);">or $40/year (4 months free)</p>
+      <ul style="list-style: none; padding: 0; margin-bottom: var(--padding-6x);">
+        <li style="margin-bottom: var(--padding-3x); display: flex; align-items: flex-start; gap: var(--padding-2x);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 2px;">
+            <path d="M12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7.75 11.9999L10.58 14.8299L16.25 9.16992" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span><strong>Unlimited</strong> allowed domains</span>
+        </li>
+        <li style="margin-bottom: var(--padding-3x); display: flex; align-items: flex-start; gap: var(--padding-2x);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 2px;">
+            <path d="M12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7.75 11.9999L10.58 14.8299L16.25 9.16992" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>Unlimited CAPTCHA challenges</span>
+        </li>
+        <li style="margin-bottom: var(--padding-3x); display: flex; align-items: flex-start; gap: var(--padding-2x);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 2px;">
+            <path d="M12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7.75 11.9999L10.58 14.8299L16.25 9.16992" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>Adaptive difficulty</span>
+        </li>
+        <li style="margin-bottom: var(--padding-3x); display: flex; align-items: flex-start; gap: var(--padding-2x);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 2px;">
+            <path d="M12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7.75 11.9999L10.58 14.8299L16.25 9.16992" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>Priority support</span>
+        </li>
+        <li style="margin-bottom: var(--padding-3x); display: flex; align-items: flex-start; gap: var(--padding-2x);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 2px;">
+            <path d="M12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7.75 11.9999L10.58 14.8299L16.25 9.16992" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>Symbolic support for free software</span>
+        </li>
+      </ul>
+      <a href="/account" class="button" style="width: 100%; text-align: center;">Get started</a>
+    </div>
   </div>
 
-  <div class="card">
-    <span class="tag">Self-hosted</span>
-    <h3>Self-hosted</h3>
-    <div class="price">$0<small>/month</small></div>
-    <div class="period">forever</div>
-    <ul>
-      <li>Run on your own server</li>
-      <li>Unlimited domains</li>
-      <li>Full source code</li>
-      <li>No third-party telemetry</li>
-    </ul>
-    <p><a href="https://github.com/livrasand/menta-captcha">Self-host &rarr;</a></p>
+  <div class="card-container with-title" style="padding: 0;">
+    <div class="title" style="padding: var(--padding-4x) var(--padding-6x);">Self-hosted</div>
+    <div style="padding: var(--padding-6x);">
+      <div style="font-size: 2.5rem; font-weight: 800; margin: var(--padding-4x) 0;">$0<span style="font-size: 1rem; font-weight: 400; color: var(--value-color);">/month</span></div>
+      <p style="color: var(--value-color); margin-bottom: var(--padding-6x);">forever</p>
+      <ul style="list-style: none; padding: 0; margin-bottom: var(--padding-6x);">
+        <li style="margin-bottom: var(--padding-3x); display: flex; align-items: flex-start; gap: var(--padding-2x);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 2px;">
+            <path d="M12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7.75 11.9999L10.58 14.8299L16.25 9.16992" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>Run on your own server</span>
+        </li>
+        <li style="margin-bottom: var(--padding-3x); display: flex; align-items: flex-start; gap: var(--padding-2x);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 2px;">
+            <path d="M12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7.75 11.9999L10.58 14.8299L16.25 9.16992" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>Unlimited domains</span>
+        </li>
+        <li style="margin-bottom: var(--padding-3x); display: flex; align-items: flex-start; gap: var(--padding-2x);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 2px;">
+            <path d="M12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7.75 11.9999L10.58 14.8299L16.25 9.16992" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>Full source code</span>
+        </li>
+        <li style="margin-bottom: var(--padding-3x); display: flex; align-items: flex-start; gap: var(--padding-2x);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 2px;">
+            <path d="M12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7.75 11.9999L10.58 14.8299L16.25 9.16992" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>No third-party telemetry</span>
+        </li>
+      </ul>
+      <a href="https://github.com/livrasand/mentacaptcha" class="button" style="width: 100%; text-align: center;">Self-host</a>
+    </div>
   </div>
 </div>
 
-<p><strong>Money-back guarantee.</strong> All paid plans come with a 15-day money-back guarantee. This guarantee is only valid on annual payments.</p>
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">45-Day Free Trial</h2>
+  <p style="margin-bottom: var(--padding-4x);">Every SaaS account starts with a 45-day free trial. No credit card required.</p>
+  <p style="color: var(--value-color);">After the trial, activate with a manual crypto verification. Domain protection keeps every account tied to its real owner.</p>
+</div>
 
-<p><strong>No surprises.</strong> SaaS plans include hosting, TLS, encrypted storage and automatic cleanup. No per-request fees. No quotas. No lock-in. After your 45-day trial, activate with a manual crypto verification. If you are a developer and prefer not to pay, self-host it for free. If you want to support the project without using SaaS, you can also do it through <a href="https://github.com/sponsors/livrasand" target="_blank">GitHub Sponsors</a>. Need help? Use our <a href="/support">anonymous support</a>.</p>
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">45-Day Money-Back Guarantee</h2>
+  <p style="color: var(--value-color);">All paid plans come with a 45-day money-back guarantee.</p>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Support the Project</h2>
+  <p style="margin-bottom: var(--padding-4x);">Prefer not to use SaaS? You can also support Menta through:</p>
+  <ul style="padding-left: var(--padding-6x);">
+    <li style="margin-bottom: var(--padding-3x);"><a href="https://github.com/sponsors/livrasand" target="_blank">GitHub Sponsors</a></li>
+    <li style="margin-bottom: var(--padding-3x);">Self-hosting and contributing code</li>
+    <li style="margin-bottom: var(--padding-3x);">Sharing the project with others</li>
+  </ul>
+</div>
+
+<div style="text-align: center; margin-top: var(--padding-12x);">
+  <p style="color: var(--value-color); margin-bottom: var(--padding-6x);">Questions? <a href="/support">Contact our anonymous support</a></p>
+</div>
+
+</div>
 
 {% include 'footer.html' %}
-</div>
+
 </body>
 </html>

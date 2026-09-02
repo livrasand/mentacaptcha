@@ -1,0 +1,26 @@
+.input-field {
+	position: relative;
+}
+
+.inner-end {
+	position: absolute;
+	top: 50%;
+	right: 3px;
+	transform: translate(0, calc(-50% - var(--padding-0_5x)));
+}
+
+.with-footer {
+	margin: 0 0 var(--padding-2x);
+
+	input {
+		margin: var(--padding) 0 var(--padding-0_25x);
+	}
+
+	.inner-end {
+		transform: translate(0, calc(-50% - var(--padding-1_5x)));
+	}
+}
+
+.footer {
+	padding: 0 var(--padding-2x);
+}

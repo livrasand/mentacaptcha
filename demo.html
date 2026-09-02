@@ -3,41 +3,51 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Menta — Demo</title>
+<title>Demo: Menta</title>
 <link rel="icon" type="image/svg+xml" href="/menta-logo.svg">
+<link rel="stylesheet" href="/css/global.css">
+<script src="/js/header.js" defer></script>
 <script src="/menta-captcha.js"></script>
 <script src="/menta-shield.js" data-menta-api=""></script>
-<style>
-  :root { --menta: #22C55E; }
-  body { font-family: "Courier New", monospace; margin: 0; padding: 2rem 0; background: #fff; color: #000; }
-  .container { max-width: 1000px; margin: 0 auto; padding: 0 1rem; }
-  p { max-width: 48rem; line-height: 1.6; margin-bottom: 1.25rem; }
-  h1 { font-size: 1.5rem; font-weight: 700; }
-  hr { border: none; border-top: 2px solid #000; margin: 1rem 0; }
-  .nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.5rem; }
-  .nav .links { margin: 0; }
-  #result { margin-top: 1.5rem; word-break: break-all; }
-  #result span { background: #f0f0f0; padding: 0.25rem 0.5rem; font-size: 0.85rem; }
-  .hidden { display: none; }
-  button:hover { background: var(--menta); color: #000; }
-  .footer { margin-top: 2rem; color: #999; font-size: 0.8rem; }
-</style>
 </head>
 <body>
 
 {% include 'nav.html' %}
-<div class="container">
 
-<h1>Menta — Demo</h1>
-<hr>
+<div class="container" style="padding: var(--padding-12x) var(--padding-6x) var(--padding-12x); max-width: 700px; margin: 0 auto;">
 
-<p>Solve the challenge. This demo runs locally; the SaaS version is tied to your domain, protected against abuse, and starts with a 45-day free trial.</p>
-<menta-widget data-cap-api-endpoint="" data-cap-i18n-initial-state="I'm not a robot" data-cap-privacy-url="/privacy" data-cap-terms-url="/terms" aria-label="Menta challenge"></menta-widget>
+<div style="text-align: center; margin-bottom: var(--padding-12x);">
+  <h1 style="margin-bottom: var(--padding-4x);">Try Menta</h1>
+  <p style="color: var(--value-color); font-size: 1.1rem;">Experience the proof-of-work challenge. No account required.</p>
+</div>
 
-<p style="font-size:0.85rem; color:#555;">Menta does not use cookies, fingerprints or third-party telemetry. Your users click once; the proof-of-work runs silently. Support is anonymous and activation is verified manually with crypto for your privacy.</p>
+<div class="card-container" style="margin-bottom: var(--padding-12x); padding: var(--padding-8x); text-align: center;">
+  <p style="margin-bottom: var(--padding-6x); color: var(--value-color);">Click the checkbox to solve the challenge:</p>
+  <menta-widget data-cap-api-endpoint="" data-cap-i18n-initial-state="I'm not a robot" aria-label="Menta challenge"></menta-widget>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">What's happening?</h2>
+  <ol style="padding-left: var(--padding-6x);">
+    <li style="margin-bottom: var(--padding-3x);">Your browser computes a SHA-256 hash until it finds one that starts with zeros</li>
+    <li style="margin-bottom: var(--padding-3x);">The solution is sent to the server for verification</li>
+    <li style="margin-bottom: var(--padding-3x);">Server issues a signed token valid for the session duration</li>
+  </ol>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Privacy Note</h2>
+  <p style="color: var(--value-color);">Menta does not use cookies, fingerprints, or third-party telemetry. Your users click once; the proof-of-work runs silently.</p>
+</div>
+
+<div style="text-align: center; margin-top: var(--padding-12x);">
+  <a href="/account" class="button" style="margin-right: var(--padding-4x);">Get Started</a>
+  <a href="/docs" class="button">Documentation</a>
+</div>
+
+</div>
 
 {% include 'footer.html' %}
-</div>
 
 </body>
 </html>

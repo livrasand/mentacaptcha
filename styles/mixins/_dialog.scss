@@ -1,0 +1,50 @@
+@mixin edit {
+	p {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--padding-2x);
+		max-width: 100%;
+	}
+
+	.container {
+		display: flex;
+		flex-direction: column;
+		width: 100%;
+		padding: var(--padding-2x) var(--padding-3x) var(--padding-2x) var(--padding-2x);
+		margin: 0;
+	}
+
+	label {
+		display: block;
+		margin: 0;
+		font-weight: var(--font-weight-bold);
+	}
+
+	.submit {
+		margin: var(--padding-1_5x) 0 var(--padding);
+	}
+}
+
+@mixin apply {
+	label {
+		display: flex;
+		gap: var(--padding-2x);
+		align-items: center;
+
+		cursor: pointer;
+	}
+
+	.category {
+		font-weight: var(--font-weight-bold);
+		margin: 0 0 var(--padding);
+
+		&.sort {
+			margin-top: var(--padding-1_5x);
+		}
+	}
+
+	label span {
+		color: var(--value-color);
+		font-weight: normal;
+	}
+}

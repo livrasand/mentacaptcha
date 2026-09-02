@@ -1,0 +1,126 @@
+@use './interaction';
+@use './shadow';
+@use './display';
+
+@mixin backdrop($color, $blur: true) {
+	@if $color == 'dark' {
+		background: rgba(0, 0, 0, 0.75);
+	} @else {
+		background: rgba(0, 0, 0, 0.15);
+	}
+
+	@if $blur {
+		backdrop-filter: blur(3px);
+	}
+}
+
+@mixin content {
+	padding: 0 1rem;
+	width: 100%;
+}
+
+@mixin popover($backdrop: light) {
+	position: fixed;
+
+	z-index: calc(var(--z-index) + 997);
+
+	@include display.inset;
+
+	.backdrop {
+		position: absolute;
+		@include display.inset;
+
+		@include backdrop($backdrop);
+
+		@include interaction.tappable;
+	}
+
+	.wrapper {
+		position: absolute;
+		top: calc(var(--popover-top) + 0.45rem);
+		left: var(--popover-left);
+		right: var(--popover-right);
+
+		cursor: initial;
+
+		--size: min(
+			var(--popover-min-size, 240px),
+			calc(100vw - 0.45rem - var(--popover-right, var(--padding-4x)))
+		);
+
+		min-width: var(--size);
+		max-width: var(--size);
+
+		width: fit-content;
+		height: auto;
+
+		max-height: calc(var(--full-vh, 100vh) - var(--popover-top) - var(--padding-2x));
+
+		overflow-x: hidden;
+		overflow-y: auto;
+
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+
+		@include shadow.strong-card;
+
+		@supports (height: 100dvh) {
+			--full-vh: 100dvh;
+		}
+
+		&.center {
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+		}
+
+		&.bottom {
+			top: auto;
+			bottom: calc(var(--full-vh, 100vh) - var(--popover-top) + 3.45rem);
+
+			height: fit-content;
+			max-height: min(calc(var(--full-vh, 100vh) - 70px), 170px);
+		}
+	}
+
+	.close {
+		align-self: flex-end;
+		margin: 0.45rem;
+	}
+
+	.popover-content {
+		width: 100%;
+		overflow-y: auto;
+	}
+}
+
+@mixin message {
+	position: absolute;
+	top: 35%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	gap: var(--padding-2x);
+
+	text-align: center;
+}
+
+@mixin title {
+	margin: 0 0 var(--padding-3x);
+}
+
+@mixin popover-container {
+	.container {
+		display: flex;
+		flex-direction: column;
+
+		width: 100%;
+
+		padding: var(--padding);
+	}
+}

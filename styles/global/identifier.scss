@@ -1,0 +1,22 @@
+@use '../mixins/text';
+
+#identifier,
+.identifier {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--padding);
+	max-width: 100%;
+
+	span {
+		word-break: break-all;
+		@include text.truncate;
+
+		&.small {
+			margin: 0 0 var(--padding-0_5x);
+		}
+	}
+
+	.small {
+		margin: 0 0 var(--padding);
+	}
+}

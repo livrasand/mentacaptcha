@@ -3,149 +3,105 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Get started with Menta</title>
+<title>Account: Menta</title>
 <link rel="icon" type="image/svg+xml" href="/menta-logo.svg">
-<style>
-  :root { --menta: #22C55E; }
-  body { font-family: "Courier New", monospace; margin: 0; padding: 2rem 0; background: #fff; color: #000; }
-  .container { max-width: 1000px; margin: 0 auto; padding: 0 1rem; }
-  h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
-  hr { border: none; border-top: 2px solid #000; margin: 1rem 0; }
-  a { color: #000; }
-  a:hover { background: #000; color: #fff; }
-  .nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 0.5rem; }
-  .nav .links { margin: 0; }
-  .form { margin: 1.5rem 0; max-width: 800px; }
-  button {
-    font-family: "Courier New", monospace;
-    padding: 0.5rem 1rem;
-    border: 1px solid #000;
-    background: #000;
-    color: #fff;
-    cursor: pointer;
-  }
-  button:hover { background: var(--menta); color: #000; }
-  .error { color: #c00; margin-top: 1rem; }
-  .success { color: #070; margin-top: 1rem; }
-  .warning { color: #c70; margin-top: 1rem; }
-  input[type="text"], input[type="password"], textarea {
-    font-family: "Courier New", monospace;
-    padding: 0.75rem;
-    border: 1px solid #000;
-    width: 300px;
-    max-width: 100%;
-  }
-  input[type="text"]:focus, input[type="password"]:focus, textarea:focus {
-    outline: none;
-    border-color: var(--menta);
-  }
-  textarea { height: 5rem; }
-  .account-number {
-    font-size: 1.2rem;
-    font-weight: 700;
-    background: #f0f0f0;
-    padding: 0.5rem;
-    display: inline-block;
-    margin: 0.5rem 0;
-  }
-  .banner {
-    border: 1px solid #000;
-    padding: 1rem;
-    margin: 1rem 0;
-    background: #f9f9f9;
-  }
-  .banner.trial { border-left: 4px solid #070; }
-  .banner.expired { border-left: 4px solid #c00; }
-  .banner.pending { border-left: 4px solid #c70; }
-  select {
-    font-family: "Courier New", monospace;
-    padding: 0.5rem;
-    border: 1px solid #000;
-    width: 300px;
-    max-width: 100%;
-  }
-  h2 { margin-top: 2.5rem; margin-bottom: 1rem; }
-  h3 { margin-top: 1.5rem; margin-bottom: 0.75rem; }
-  .footer { margin-top: 2rem; color: #999; font-size: 0.8rem; }
-</style>
+<link rel="stylesheet" href="/css/global.css">
+<script src="/js/header.js" defer></script>
 </head>
 <body>
 
 {% include 'nav.html' %}
-<div class="container">
+
+<div class="container" style="padding: var(--padding-12x) var(--padding-6x) var(--padding-12x); max-width: 700px; margin: 0 auto;">
+
+<div style="text-align: center; margin-bottom: var(--padding-12x);">
+  <h1 style="margin-bottom: var(--padding-4x);">Account</h1>
+  <p style="color: var(--value-color); font-size: 1.1rem;">45-day free trial. No credit card required.</p>
+</div>
 
 <div id="auth-section">
-  <p>SaaS accounts are tied to a domain and come with a 45-day free trial. Activation is verified manually with cryptocurrency for privacy. All support is anonymous.</p>
-
-  <h2>Register</h2>
-  <div class="form" role="form" aria-label="Register account">
-    <label for="register-domains">Allowed origins (comma-separated):</label><br>
-    <input type="text" id="register-domains" placeholder="https://example.com, https://app.example.com" aria-describedby="register-error register-success" style="width: 420px;"><br>
-    <label for="register-plan">Plan:</label><br>
-    <select id="register-plan">
-      <option value="beginner">Beginner ($1/mo or $10/yr, 1 domain)</option>
-      <option value="developer">Developer ($5/mo or $50/yr, unlimited domains)</option>
-    </select><br>
-    <label for="register-ntfy">ntfy topic (optional):</label><br>
-    <input type="text" id="register-ntfy" placeholder="my-menta-alerts" style="width: 300px;"><br>
-    <label for="register-notes">Notes (optional):</label><br>
-    <input type="text" id="register-notes" placeholder="Customer note" style="width: 420px;"><br>
-    <button id="register-account" type="button">Register</button>
+  <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+    <h2 style="margin-bottom: var(--padding-6x);">Register</h2>
+    <div class="form" role="form" aria-label="Register account">
+      <label for="register-domains">Allowed origins (comma-separated)</label>
+      <input type="text" id="register-domains" placeholder="https://example.com, https://app.example.com">
+      <label for="register-plan">Plan</label>
+      <select id="register-plan">
+        <option value="beginner">Beginner ($1/mo or $10/yr, 1 domain)</option>
+        <option value="developer">Developer ($5/mo or $50/yr, unlimited domains)</option>
+      </select>
+      <label for="register-ntfy">ntfy topic (optional)</label>
+      <input type="text" id="register-ntfy" placeholder="my-menta-alerts">
+      <label for="register-notes">Notes (optional)</label>
+      <input type="text" id="register-notes" placeholder="Customer note">
+      <button id="register-account" type="button" style="width: 100%; margin-top: var(--padding-4x);">Create Account</button>
+    </div>
+    <div id="register-error" class="error" style="display:none; margin-top: var(--padding-4x);" role="status" aria-live="polite"></div>
+    <div id="register-success" class="success" style="display:none; margin-top: var(--padding-4x);" role="status" aria-live="polite"></div>
   </div>
-  <div id="register-error" class="error" style="display:none;" role="status" aria-live="polite"></div>
-  <div id="register-success" class="success" style="display:none;" role="status" aria-live="polite"></div>
 
-  <h2>Login</h2>
-  <div class="form" role="form" aria-label="Account login">
-    <label for="account-number">Account number:</label><br>
-    <input type="text" id="account-number" placeholder="16-digit account number" aria-describedby="login-error" style="width: 220px;"><br>
-    <label for="account-totp-code">TOTP code (if 2FA enabled):</label><br>
-    <input type="text" id="account-totp-code" placeholder="000000" style="width: 220px;"><br>
-    <label for="account-recovery-code">Recovery code (if no TOTP):</label><br>
-    <input type="text" id="account-recovery-code" placeholder="8-digit code" style="width: 220px;"><br>
-    <label style="display:block;margin:0.5rem 0;">
-      <input type="checkbox" id="remember-account" style="width:auto;"> Remember me for 30 days
-    </label>
-    <button id="login-account" type="button">Login</button>
+  <div class="card-container" style="padding: var(--padding-6x);">
+    <h2 style="margin-bottom: var(--padding-6x);">Login</h2>
+    <div class="form" role="form" aria-label="Account login">
+      <label for="account-number">Account number</label>
+      <input type="text" id="account-number" placeholder="16-digit account number">
+      <label for="account-totp-code">TOTP code (if 2FA enabled)</label>
+      <input type="text" id="account-totp-code" placeholder="000000">
+      <label for="account-recovery-code">Recovery code (if no TOTP)</label>
+      <input type="text" id="account-recovery-code" placeholder="8-digit code">
+      <label class="options">
+        <input type="checkbox" id="remember-account"> Remember me for 30 days
+      </label>
+      <button id="login-account" type="button" style="width: 100%; margin-top: var(--padding-4x);">Login</button>
+    </div>
+    <div id="login-error" class="error" style="display:none; margin-top: var(--padding-4x);" role="status" aria-live="polite"></div>
   </div>
-  <div id="login-error" class="error" style="display:none;" role="status" aria-live="polite"></div>
 </div>
 
-<div id="login-status" class="banner" style="display:none;" role="status" aria-live="polite"></div>
+<div id="login-status" class="card-container" style="display:none; margin-bottom: var(--padding-8x); padding: var(--padding-6px);" role="status" aria-live="polite"></div>
 
 <div id="account-management" style="display:none;">
-  <button id="logout-account" type="button" style="background:#fff;color:#000;">Logout</button>
-  <h2>Account settings</h2>
+  <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--padding-6x);">
+      <h2>Account Settings</h2>
+      <button id="logout-account" type="button" class="text">Logout</button>
+    </div>
 
-  <h3>Manage domains</h3>
-  <div class="form" role="form" aria-label="Manage domains">
-    <label for="account-domains">Allowed origins:</label><br>
-    <textarea id="account-domains" aria-describedby="domains-error domains-success"></textarea><br>
-    <button id="save-domains" type="button">Save domains</button>
+    <h3 style="margin-bottom: var(--padding-4x);">Manage Domains</h3>
+    <div class="form" role="form" aria-label="Manage domains">
+      <textarea id="account-domains" rows="3" placeholder="https://example.com, https://app.example.com"></textarea>
+      <button id="save-domains" type="button" style="width: 100%; margin-top: var(--padding-4x);">Save Domains</button>
+    </div>
+    <div id="domains-error" class="error" style="display:none; margin-top: var(--padding-4x);" role="status" aria-live="polite"></div>
+    <div id="domains-success" class="success" style="display:none; margin-top: var(--padding-4x);" role="status" aria-live="polite"></div>
   </div>
-  <div id="domains-error" class="error" style="display:none;" role="status" aria-live="polite"></div>
-  <div id="domains-success" class="success" style="display:none;" role="status" aria-live="polite"></div>
 
-  <h3>Two-factor authentication</h3>
-  <div id="account-2fa-setup" style="display:none;">
-    <button id="setup-account-2fa" type="button">Setup 2FA</button>
-    <p>Scan the QR code with your authenticator app, then enter the 6-digit code to enable 2FA.</p>
-    <div id="account-2fa-qr" style="margin: 1rem 0;"></div>
-    <label for="account-2fa-code">Verification code:</label><br>
-    <input type="text" id="account-2fa-code" placeholder="000000" style="width: 220px;"><br>
-    <button id="verify-account-2fa" type="button">Enable 2FA</button>
-    <div id="account-2fa-result" class="success" style="display:none;" role="status" aria-live="polite"></div>
-  </div>
-  <div id="account-2fa-enabled" style="display:none;">
-    <p>2FA is enabled for this account.</p>
-    <label for="account-2fa-disable-code">TOTP or recovery code to disable:</label><br>
-    <input type="text" id="account-2fa-disable-code" placeholder="000000" style="width: 220px;">
-    <button id="disable-account-2fa" type="button" style="background:#fff;color:#000;">Disable 2FA</button>
+  <div class="card-container" style="padding: var(--padding-6x);">
+    <h3 style="margin-bottom: var(--padding-4x);">Two-Factor Authentication</h3>
+    <div id="account-2fa-setup">
+      <p style="margin-bottom: var(--padding-4x); color: var(--value-color);">Protect your account with TOTP authentication.</p>
+      <button id="setup-account-2fa" type="button">Setup 2FA</button>
+      <div id="account-2fa-qr" style="margin: var(--padding-4x) 0;"></div>
+      <label for="account-2fa-code">Verification code</label>
+      <input type="text" id="account-2fa-code" placeholder="000000">
+      <button id="verify-account-2fa" type="button" style="width: 100%; margin-top: var(--padding-4x);">Enable 2FA</button>
+    </div>
+    <div id="account-2fa-enabled">
+      <p style="margin-bottom: var(--padding-4x); color: var(--color-success);">2FA is enabled for this account.</p>
+      <label for="account-2fa-disable-code">TOTP or recovery code to disable</label>
+      <input type="text" id="account-2fa-disable-code" placeholder="000000">
+      <button id="disable-account-2fa" type="button" style="width: 100%; margin-top: var(--padding-4x);">Disable 2FA</button>
+    </div>
+    <div id="account-2fa-result" class="success" style="display:none; margin-top: var(--padding-4x);" role="status" aria-live="polite"></div>
   </div>
 </div>
 
-<h2>Support</h2>
-<p><a href="/support">Open an anonymous support ticket</a> if you need to activate your account, claim a domain or have any question. No email or personal data is required. You can optionally add an <a href="https://ntfy.sh" target="_blank">ntfy</a> topic to get a discreet notification when we reply.</p>
+<div style="text-align: center; margin-top: var(--padding-12x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Need Help?</h2>
+  <p style="color: var(--value-color);">Open an <a href="/support">anonymous support ticket</a> for activation, domain claims, or any questions.</p>
+</div>
+
+</div>
 
 {% include 'footer.html' %}
 
@@ -171,13 +127,12 @@
     const statusEl = document.getElementById('login-status');
     document.getElementById('account-domains').value = account.domains;
     updateAccount2FAUI(account.totp_enabled);
-    statusEl.className = 'banner ' + (account.status === 'trial' ? 'trial' : (account.status === 'active' ? '' : 'expired'));
+    statusEl.className = 'card-container ' + (account.status === 'trial' ? 'trial' : (account.status === 'active' ? '' : 'expired'));
     if (account.status === 'trial') {
       statusEl.innerHTML = '<strong>Trial active.</strong> ' + (account.trial_days_left || 0) + ' day(s) left. <a href="/support">Contact support to activate</a>.';
     } else if (account.status === 'active') {
       statusEl.innerHTML = '<strong>Account active.</strong> Plan: ' + account.plan + '.';
     } else if (account.status === 'pending_claim') {
-      statusEl.className = 'banner pending';
       statusEl.innerHTML = '<strong>Account pending domain verification.</strong> <a href="/support">Open a support claim</a>.';
     } else {
       statusEl.innerHTML = '<strong>Account inactive.</strong> <a href="/support">Contact support to reactivate</a>.';
@@ -264,8 +219,8 @@
       if (data.primary_domain) html += '<br>Primary domain: ' + data.primary_domain;
       if (data.trial_days) html += '<br>Trial: ' + data.trial_days + ' days';
       if (data.domain_alert) html += '<br><span class="warning">' + data.domain_alert + '</span>';
-      html += '<br><button type="button" id="copy-account-number" style="background:#fff;color:#000;margin-top:0.5rem;">Copy number</button> ';
-      html += '<button type="button" id="download-account-txt" style="background:#fff;color:#000;margin-top:0.5rem;">Download .txt</button>';
+      html += '<br><button type="button" id="copy-account-number" style="margin-top:var(--padding);">Copy number</button> ';
+      html += '<button type="button" id="download-account-txt" style="margin-top:var(--padding);">Download .txt</button>';
       okEl.innerHTML = html;
       okEl.style.display = 'block';
       document.getElementById('copy-account-number').addEventListener('click', copyAccountNumber);
@@ -367,7 +322,7 @@
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
       account2faSecret = data.secret;
-      document.getElementById('account-2fa-qr').innerHTML = '<img src="data:image/svg+xml;base64,' + data.qr + '" alt="QR" style="max-width:240px;border:1px solid #000;"><br><code>' + data.uri + '</code>';
+      document.getElementById('account-2fa-qr').innerHTML = '<img src="data:image/svg+xml;base64,' + data.qr + '" alt="QR" style="max-width:240px;border:1px solid var(--color-card-contrast);"><br><code>' + data.uri + '</code>';
       document.getElementById('account-2fa-setup').style.display = 'block';
     } catch (e) {
       resultEl.textContent = e.message;
@@ -454,6 +409,6 @@
   document.getElementById('disable-account-2fa').addEventListener('click', disableAccount2FA);
   restoreAccountSession();
 </script>
-</div>
+
 </body>
 </html>
