@@ -1,7 +1,7 @@
 # Menta CAPTCHA 🍃
 
-> **Free, self-hosted, privacy-first CAPTCHA for the modern web.**  
-> No Google telemetry. No tracking cookies. No endless image puzzles.
+**Free, self-hosted, privacy-first CAPTCHA for the modern web.**  
+No Google telemetry. No tracking cookies. No endless image puzzles.
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-brightgreen)](https://www.python.org/)
@@ -22,7 +22,7 @@ The Web Component automatically initializes and manages the challenge flow in th
 
 ---
 
-### ⚙️ Widget Configuration
+### Widget Configuration
 
 Customize theme, layout, typography, accents, and internationalization via standard `data-cap-*` HTML attributes.
 
@@ -75,7 +75,7 @@ Customize theme, layout, typography, accents, and internationalization via stand
 
 ---
 
-### 🎨 Fully Customized HTML Example
+### Fully Customized HTML Example
 
 ```html
 <menta-widget
@@ -100,7 +100,7 @@ Customize theme, layout, typography, accents, and internationalization via stand
 
 ---
 
-### 🖥️ Backend Token Verification
+### Backend Token Verification
 
 Verify submitted CAPTCHA tokens directly against your self-hosted backend API or via Python:
 
