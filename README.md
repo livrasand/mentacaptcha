@@ -1,53 +1,148 @@
-# Menta CAPTCHA
+# Menta CAPTCHA 🍃
 
-Menta CAPTCHA is not trying to compete with reCAPTCHA, hCaptcha, or similar solutions. It is an alternative built for developers who value their users' privacy and want to protect them as much as possible.
+> **Free, self-hosted, privacy-first CAPTCHA for the modern web.**  
+> No Google telemetry. No tracking cookies. No endless image puzzles.
 
-## Who is it for
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Python Version](https://img.shields.io/badge/python-3.8%2B-brightgreen)](https://www.python.org/)
 
-For those who do not trust large corporations to process their users' data. For those who prefer a self-hostable, lightweight, private, anonymous, and bot-safe solution.
+---
 
-## What it offers
+### Quick Start
 
-- Server-verified proof of work.
-- No images, fingerprints, or telemetry.
-- No cookies, no localStorage, no third-party dependencies.
-- IP anonymization by default.
-- At-rest encryption with SQLCipher.
-- Data subject rights: export and deletion by IP.
-- Accessible widget with keyboard and screen reader support.
+Add Menta to your HTML in two lines:
 
-## Installation
+```html
+<script src="https://mentacaptchaeu.eu.pythonanywhere.com/menta-captcha.js"></script>
+<menta-widget data-cap-api-endpoint="https://mentacaptchaeu.eu.pythonanywhere.com/docs"></menta-widget>
 
-1. Clone the repository.
-2. Create a virtual environment and install dependencies:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   ```
-3. Create a `.env` file with the required variables.
-4. Run:
-   ```bash
-   python app.py
-   ```
+```
 
-The development server will start at `http://localhost:5000`.
+The Web Component automatically initializes and manages the challenge flow in the client browser.
 
-> **Note:** `app.run(port=5000)` is for development only. In production use Gunicorn, uWSGI, or another WSGI server with TLS.
+---
 
-## Environment variables
+### ⚙️ Widget Configuration
 
-| Variable | Description |
-| --- | --- |
-| `SECRET_KEY` | Key for signing sessions and tokens. |
-| `ADMIN_TOKEN` | Bearer token for accessing the admin dashboard. |
-| `DB_ENCRYPTION_KEY` | SQLCipher key for encrypting the database at rest. |
-| `DATA_RETENTION_HOURS` | Data retention time in hours. |
-| `LOG_IP_FULL` | If `true`, stores the full IP. Defaults to prefix only. |
+Customize theme, layout, typography, accents, and internationalization via standard `data-cap-*` HTML attributes.
 
-## Basic usage
+#### Theme & Dimensions
 
-1. Register an account at `/account`.
-2. Add the domains where you will use the widget.
-3. Copy the widget snippet into your site.
-4. Verify the token sent from the server.
+```html
+<menta-widget
+  data-cap-api-endpoint="https://mentacaptchaeu.eu.pythonanywhere.com/"
+  data-cap-theme="dark"
+  data-cap-width="340px"
+  data-cap-height="64px"
+  data-cap-border-radius="12px">
+</menta-widget>
+
+```
+
+| Attribute | Description | Default |
+| --- | --- | --- |
+| `data-cap-theme` | Color theme (`light`, `dark`, `auto`) | `light` |
+| `data-cap-width` | Widget width | `300px` |
+| `data-cap-height` | Widget height | `70px` |
+| `data-cap-padding` | Inner padding | `0 15px` |
+| `data-cap-background` | Background color | `#fff` / `#212121` |
+| `data-cap-border-color` | Border color | `#e0e0e0` / `#424242` |
+| `data-cap-border-radius` | Corner radius | `20px` |
+| `data-cap-box-shadow` | Box shadow | `0 2px 4px rgba(0,0,0,0.05)` |
+
+#### Typography & Colors
+
+| Attribute | Description | Default |
+| --- | --- | --- |
+| `data-cap-font-family` | Font stack | System sans-serif |
+| `data-cap-font-size` | Label font size | `16px` |
+| `data-cap-font-weight` | Label font weight | `400` |
+| `data-cap-text-color` | Label text color | `#333` / `#e6e6e6` |
+| `data-cap-primary-color` | Brand accent color | `#22C55E` |
+| `data-cap-checkmark-color` | Checkmark color | Same as primary |
+| `data-cap-spinner-color` | Spinner loader color | `#757575` |
+| `data-cap-brand-color` | Brand link color | `#757575` |
+
+#### Internationalization (i18n)
+
+| Attribute | Description | Default Text |
+| --- | --- | --- |
+| `data-cap-i18n-initial-state` | Initial state label | `"I'm not a robot"` |
+| `data-cap-i18n-loading` | Loading state | `"Loading..."` |
+| `data-cap-i18n-verifying` | Verification state | `"Verifying..."` |
+| `data-cap-i18n-success` | Success state | `"Verified"` |
+| `data-cap-i18n-error` | Error state | `"Error. Try again."` |
+
+---
+
+### 🎨 Fully Customized HTML Example
+
+```html
+<menta-widget
+  data-cap-api-endpoint="https://mentacaptchaeu.eu.pythonanywhere.com/"
+  data-cap-i18n-initial-state="I'm not a robot"
+  data-cap-theme="dark"
+  data-cap-width="340px"
+  data-cap-height="64px"
+  data-cap-border-radius="12px"
+  data-cap-border-color="#22C55E"
+  data-cap-primary-color="#22C55E"
+  data-cap-background="#121212"
+  data-cap-text-color="#f0f0f0"
+  data-cap-font-family="'Inter', sans-serif"
+  data-cap-font-size="15px"
+  data-cap-checkbox-size="26px"
+  data-cap-box-shadow="0 4px 12px rgba(0,0,0,0.5)"
+  data-cap-css=".container { transition: all .2s ease; }">
+</menta-widget>
+
+```
+
+---
+
+### 🖥️ Backend Token Verification
+
+Verify submitted CAPTCHA tokens directly against your self-hosted backend API or via Python:
+
+#### HTTP API Call
+
+```http
+POST /verify HTTP/1.1
+Content-Type: application/json
+
+{
+  "token": "eyJhbGciOiJIUzI1NiIs..."
+}
+
+```
+
+**Response:**
+
+```json
+{
+  "valid": true,
+  "tenant_id": "your-tenant"
+}
+
+```
+
+#### Python Integration
+
+```python
+from mentacaptcha import MentaCaptcha
+
+captcha = MentaCaptcha()
+
+# Verify token from frontend request
+is_valid = captcha.verify(challenge_id, user_response)
+
+```
+
+---
+
+### Key Features
+
+* **100% Privacy-First:** Zero external requests, zero third-party tracking, fully GDPR compliant out of the box.
+* **No Visual Puzzles:** Protects forms without frustrating your human users with traffic lights and crosswalks.
+* **Lightweight & Fast:** Sub-millisecond validation time with zero database setup required.
+* **Apache 2.0 Licensed:** Free for commercial and open-source projects without AGPL constraints.
