@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>404 — Page not found · Menta</title>
+<meta name="description" content="The page you are looking for could not be found. Head back to Menta, the privacy-first, self-hosted CAPTCHA powered by proof-of-work.">
+<link rel="icon" type="image/svg+xml" href="/menta-logo.svg">
+<link rel="stylesheet" href="/css/global.css">
+<script src="/js/header.js" defer></script>
+</head>
+<body>
+
+{% include 'nav.html' %}
+
+<div class="container" style="padding: var(--padding-12x) var(--padding-6x) var(--padding-12x); max-width: 900px; margin: 0 auto;">
+
+<div class="card-container" style="margin-bottom: var(--padding-12x); padding: var(--padding-8x);">
+  <div style="text-align: center;">
+    <div style="font-size: 6rem; font-weight: 800; line-height: 1; color: var(--color-primary); margin-bottom: var(--padding-4x);">404</div>
+    <h1 style="font-size: 2.25rem; margin-bottom: var(--padding-6x); font-weight: 800; line-height: 1.15;">This page never phoned home</h1>
+    <p style="font-size: 1.15rem; color: var(--value-color); margin-bottom: var(--padding-8x); max-width: 640px; margin-left: auto; margin-right: auto;">The link you followed may be broken, removed, or mistyped. No cookies were set, no fingerprints taken, and no data left your server while finding that out.</p>
+    <div style="display: flex; gap: var(--padding-4x); justify-content: center; flex-wrap: wrap; margin-bottom: var(--padding-6x);">
+      <a href="/" class="button" style="padding: var(--padding-3x) var(--padding-6x); font-size: 1.1rem;">Back to home</a>
+      <a href="/demo" class="button" style="padding: var(--padding-3x) var(--padding-6x); font-size: 1.1rem;">Try the live demo</a>
+    </div>
+    <p style="color: var(--value-color); font-size: var(--font-size-small); margin: 0;">Lost? Try <a href="/features">Features</a> &middot; <a href="/how-it-works">How it Works</a> &middot; <a href="/docs">Docs</a> &middot; <a href="/dashboard">Dashboard</a></p>
+  </div>
+</div>
+
+</div>
+
+{% include 'footer.html' %}
+
+</body>
+</html>

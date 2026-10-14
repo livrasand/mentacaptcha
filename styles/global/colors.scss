@@ -44,20 +44,20 @@
 	--color-body-shade: #dcdcdc;
 	--color-body-tint: #fbfbfb;
 
-	/** Default: lavender-blue */
-	--color-primary: #7888ff;
-	--color-primary-rgb: 120, 136, 255;
+	/** Default: mint-green */
+	--color-primary: #22c45e;
+	--color-primary-rgb: 34, 196, 94;
 	--color-primary-contrast: var(--text-color);
 	--color-primary-contrast-rgb: var(--text-color-rgb);
-	--color-primary-shade: #6a78e0;
-	--color-primary-tint: #8694ff;
+	--color-primary-shade: #1eac53;
+	--color-primary-tint: #38ca6e;
 
-	--color-primary-opaque: #c9cfff;
-	--color-primary-opaque-rgb: 201, 207, 255;
+	--color-primary-opaque: #a7e7bf;
+	--color-primary-opaque-rgb: 167, 231, 191;
 	--color-primary-opaque-contrast: #000000;
 	--color-primary-opaque-contrast-rgb: 0, 0, 0;
-	--color-primary-opaque-shade: #b1b6e0;
-	--color-primary-opaque-tint: #ced4ff;
+	--color-primary-opaque-shade: #93cba8;
+	--color-primary-opaque-tint: #b0e9c5;
 
 	/** Json */
 	--json-bracket-color: #9a9a9a;
@@ -422,13 +422,13 @@
 		--color-body-shade: #18181a;
 		--color-body-tint: #323234;
 
-		/** Default: lavender-blue */
-		--color-primary-opaque: #414674;
-		--color-primary-opaque-rgb: 65, 70, 116;
+		/** Default: mint-green */
+		--color-primary-opaque: #4b7159;
+		--color-primary-opaque-rgb: 75, 113, 89;
 		--color-primary-opaque-contrast: #ffffff;
 		--color-primary-opaque-contrast-rgb: 255, 255, 255;
-		--color-primary-opaque-shade: #393e66;
-		--color-primary-opaque-tint: #545982;
+		--color-primary-opaque-shade: #42634e;
+		--color-primary-opaque-tint: #5d7f6a;
 
 		/** Json */
 		--json-bracket-color: #8a8a8a;

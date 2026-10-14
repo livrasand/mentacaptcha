@@ -17,6 +17,53 @@
 <h1 style="margin-bottom: var(--padding-8x); text-align: center;">Documentation</h1>
 
 <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Self-Hosting</h2>
+  <p style="margin-bottom: var(--padding-4x);">Menta is designed to run on your own server, VPS, or edge host. You keep the data, the keys, and the logs — no third-party service sits in the path.</p>
+
+  <h3 style="margin-bottom: var(--padding-3x); margin-top: var(--padding-6x);">1. Requirements</h3>
+  <ul style="padding-left: var(--padding-6x); margin-bottom: var(--padding-4x);">
+    <li style="margin-bottom: var(--padding-2x);">Python 3.8 or newer</li>
+    <li style="margin-bottom: var(--padding-2x);">A TLS-terminating reverse proxy (nginx, Caddy, or your platform's load balancer) for production</li>
+  </ul>
+
+  <h3 style="margin-bottom: var(--padding-3x); margin-top: var(--padding-6x);">2. Install</h3>
+  <pre style="background: var(--color-body); padding: var(--padding-4x); border-radius: var(--border-radius); overflow-x: auto; margin-bottom: var(--padding-4x);"><code>git clone https://github.com/livrasand/mentacaptcha
+cd mentacaptcha
+pip install -r requirements.txt</code></pre>
+
+  <h3 style="margin-bottom: var(--padding-3x); margin-top: var(--padding-6x);">3. Configure</h3>
+  <p style="margin-bottom: var(--padding-3x);">Create a <code style="display: inline; padding: 2px 8px;">.env</code> file in the project root. All settings are optional — sensible privacy-safe defaults apply when they are omitted.</p>
+  <pre style="background: var(--color-body); padding: var(--padding-4x); border-radius: var(--border-radius); overflow-x: auto; margin-bottom: var(--padding-4x);"><code>DB_PATH=/var/lib/menta/menta.db
+DB_ENCRYPTION_KEY=replace-with-a-strong-passphrase
+CORS_ORIGINS=https://app.example.com
+TRUSTED_PROXIES=127.0.0.1
+DATA_RETENTION_HOURS=24
+LOG_IP_FULL=false</code></pre>
+  <div class="table-container" style="margin-bottom: var(--padding-4x);">
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Purpose</th><th>Default</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>DB_PATH</code></td><td>Location of the SQLite/SQLCipher database</td><td><code>menta.db</code></td></tr>
+        <tr><td><code>DB_ENCRYPTION_KEY</code></td><td>Encrypts data at rest via SQLCipher. When set and <code>sqlcipher3</code> is installed, the database is encrypted; otherwise it falls back to plain SQLite.</td><td>empty (plain)</td></tr>
+        <tr><td><code>CORS_ORIGINS</code></td><td>Comma-separated list of origins allowed to call the API</td><td><code>strict</code></td></tr>
+        <tr><td><code>TRUSTED_PROXIES</code></td><td>Proxy addresses/CIDRs whose <code>X-Forwarded-For</code> headers are trusted</td><td>empty</td></tr>
+        <tr><td><code>DATA_RETENTION_HOURS</code></td><td>How long challenge data is retained before cleanup</td><td><code>24</code></td></tr>
+        <tr><td><code>LOG_IP_FULL</code></td><td>Store full IPs instead of anonymized <code>/24</code> (IPv4) or <code>/64</code> (IPv6) prefixes</td><td><code>false</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 style="margin-bottom: var(--padding-3x); margin-top: var(--padding-6x);">4. Run</h3>
+  <p style="margin-bottom: var(--padding-3x);">For local development:</p>
+  <pre style="background: var(--color-body); padding: var(--padding-4x); border-radius: var(--border-radius); overflow-x: auto; margin-bottom: var(--padding-4x);"><code>python app.py   # serves on http://localhost:5000</code></pre>
+  <p style="margin-bottom: var(--padding-4x);">For production, run the Flask app behind a WSGI server (gunicorn, waitress, or uWSGI) on your own host and terminate TLS at your reverse proxy. Set <code style="display: inline; padding: 2px 8px;">CORS_ORIGINS</code> to the exact origins permitted to load the widget and <code style="display: inline; padding: 2px 8px;">TRUSTED_PROXIES</code> to your proxy so client IPs are resolved correctly.</p>
+
+  <p style="color: var(--value-color);">Then point the widget at your instance — see Quick Start below, using your own domain as <code style="display: inline; padding: 2px 8px;">data-cap-api-endpoint</code>.</p>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
   <h2 style="margin-bottom: var(--padding-4x);">Quick Start</h2>
   <p style="margin-bottom: var(--padding-4x);">Add Menta to your page in two lines:</p>
   <pre style="background: var(--color-body); padding: var(--padding-4x); border-radius: var(--border-radius); overflow-x: auto; margin-bottom: var(--padding-4x);"><code>&lt;script src="https://your-domain.com/menta-captcha.js"&gt;&lt;/script&gt;
@@ -82,7 +129,7 @@
         <tr><th>Attribute</th><th>Description</th><th>Default</th></tr>
       </thead>
       <tbody>
-        <tr><td>data-cap-primary-color</td><td>Brand color</td><td><code>#22C55E</code></td></tr>
+        <tr><td>data-cap-primary-color</td><td>Brand color</td><td><code>#22C45E</code></td></tr>
         <tr><td>data-cap-checkmark-color</td><td>Checkmark color</td><td>Same as primary</td></tr>
         <tr><td>data-cap-brand-color</td><td>"Brand link color</td><td><code>#757575</code></td></tr>
         <tr><td>data-cap-link-color</td><td>Link color</td><td><code>#757575</code></td></tr>
@@ -128,8 +175,8 @@
   data-cap-width="340px"
   data-cap-height="64px"
   data-cap-border-radius="12px"
-  data-cap-border-color="#22C55E"
-  data-cap-primary-color="#22C55E"
+  data-cap-border-color="#22C45E"
+  data-cap-primary-color="#22C45E"
   data-cap-background="#121212"
   data-cap-text-color="#f0f0f0"
   data-cap-font-family="'Inter', sans-serif"

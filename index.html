@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Privacy-First CAPTCHA: Menta</title>
+<title>Menta — Privacy-First, Self-Hosted CAPTCHA</title>
+<meta name="description" content="Menta is a free, open-source, self-hosted CAPTCHA powered by proof-of-work. No Google, no cookies, no tracking, no image puzzles. Deploy it on your own server in minutes.">
 <link rel="icon" type="image/svg+xml" href="/menta-logo.svg">
 <link rel="stylesheet" href="/css/global.css">
 <script src="/js/header.js" defer></script>
@@ -16,33 +17,17 @@
 
 <div class="card-container" style="margin-bottom: var(--padding-12x); padding: var(--padding-8x);">
   <div style="text-align: center;">
-    <h1 style="font-size: 2.5rem; margin-bottom: var(--padding-6x); font-weight: 800;">Privacy-first bot protection</h1>
-    <p style="font-size: 1.2rem; color: var(--value-color); margin-bottom: var(--padding-8x); max-width: 600px; margin-left: auto; margin-right: auto;">Self-hosted CAPTCHA with zero telemetry. No Google. No cookies. No visual puzzles. Just proof-of-work.</p>
+    <h1 style="font-size: 2.5rem; margin-bottom: var(--padding-6x); font-weight: 800; line-height: 1.15;">The CAPTCHA that never phones home</h1>
+    <p style="font-size: 1.2rem; color: var(--value-color); margin-bottom: var(--padding-6x); max-width: 640px; margin-left: auto; margin-right: auto;">Menta is a free, self-hosted, privacy-first CAPTCHA powered by proof-of-work. No Google. No cookies. No image puzzles. Drop it on <strong>your</strong> server and own your bot defense end to end — no per-request bills, no quotas, no vendor lock-in.</p>
+    <p style="font-size: 1rem; color: var(--value-color); margin-bottom: var(--padding-8x); max-width: 640px; margin-left: auto; margin-right: auto;">Two lines of HTML. Full source code. Your data stays yours, forever.</p>
     <div style="display: flex; gap: var(--padding-4x); justify-content: center; flex-wrap: wrap;">
-      <a href="/demo" class="button" style="padding: var(--padding-3x) var(--padding-6x); font-size: 1.1rem;">Try Demo</a>
-      <a href="/pricing" class="button" style="padding: var(--padding-3x) var(--padding-6x); font-size: 1.1rem;">View Pricing</a>
+      <a href="https://github.com/livrasand/mentacaptcha" class="button" style="padding: var(--padding-3x) var(--padding-6x); font-size: 1.1rem;">Self-host it free</a>
+      <a href="/demo" class="button" style="padding: var(--padding-3x) var(--padding-6x); font-size: 1.1rem;">Try the live demo</a>
     </div>
   </div>
 </div>
 
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--padding-8x); margin-bottom: var(--padding-12x);">
-  <div class="card-container" style="padding: var(--padding-6x);">
-    <h3 style="margin-bottom: var(--padding-4x);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-<g clip-path="url(#clip0_4418_9520)">
-<path d="M6 10V8C6 4.69 7 2 12 2C17 2 18 4.69 18 8V10" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-<path d="M17 22H7C3 22 2 21 2 17V15C2 11 3 10 7 10H17C21 10 22 11 22 15V17C22 21 21 22 17 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-<path d="M15.9965 16H16.0054" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-<path d="M11.9955 16H12.0045" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-<path d="M7.99451 16H8.00349" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-</g>
-<defs>
-<clipPath id="clip0_4418_9520">
-<rect width="24" height="24" fill="white"/>
-</clipPath>
-</defs>
-</svg> Strict No-Logs Policy</h3>
-    <p style="color: var(--value-color);">We never log challenge activity or connection data on our infrastructure. No sign-up required to use the self-hosted version.</p>
-  </div>
   <div class="card-container" style="padding: var(--padding-6x);">
     <h3 style="margin-bottom: var(--padding-4x);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
 <g clip-path="url(#clip0_4418_10164)">
@@ -61,8 +46,25 @@
 <rect width="24" height="24" fill="white"/>
 </clipPath>
 </defs>
-</svg> Anonymous Crypto Payments</h3>
-    <p style="color: var(--value-color);">Pay with Bitcoin, Monero &amp; Zcash on SaaS plans, or self-host the full source for free.</p>
+</svg> Self-Host in Minutes</h3>
+    <p style="color: var(--value-color);">Clone the repo, run it, done. The entire CAPTCHA lives on your infrastructure — your server, your VPS, your rules. No SaaS account required, ever.</p>
+  </div>
+  <div class="card-container" style="padding: var(--padding-6x);">
+    <h3 style="margin-bottom: var(--padding-4x);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+<g clip-path="url(#clip0_4418_9520)">
+<path d="M6 10V8C6 4.69 7 2 12 2C17 2 18 4.69 18 8V10" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M17 22H7C3 22 2 21 2 17V15C2 11 3 10 7 10H17C21 10 22 11 22 15V17C22 21 21 22 17 22Z" stroke="var(--color-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M15.9965 16H16.0054" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M11.9955 16H12.0045" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M7.99451 16H8.00349" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+</g>
+<defs>
+<clipPath id="clip0_4418_9520">
+<rect width="24" height="24" fill="white"/>
+</clipPath>
+</defs>
+</svg> Strict No-Logs Policy</h3>
+    <p style="color: var(--value-color);">Your challenge activity and connection data never leave your server — because there is no "our" server. Nothing to leak, nothing to sell, nothing to subpoena.</p>
   </div>
   <div class="card-container" style="padding: var(--padding-6x);">
     <h3 style="margin-bottom: var(--padding-4x);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -77,7 +79,7 @@
 </clipPath>
 </defs>
 </svg> No Tracking, No Cookies</h3>
-    <p style="color: var(--value-color);">No cookies, no fingerprints, no third-party scripts. IP addresses truncated by default.</p>
+    <p style="color: var(--value-color);">No cookies, no browser fingerprints, no third-party scripts, no hidden beacons. IP addresses are truncated by default — GDPR-friendly out of the box.</p>
   </div>
   <div class="card-container" style="padding: var(--padding-6x);">
     <h3 style="margin-bottom: var(--padding-4x);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -92,7 +94,7 @@
 </clipPath>
 </defs>
 </svg> Instant Activation</h3>
-    <p style="color: var(--value-color);">Drop the script tag and protection works the moment a request hits your endpoint. No waiting, no approvals.</p>
+    <p style="color: var(--value-color);">Drop in the script tag and protection is live the moment a request hits your endpoint. No waiting, no approvals, no "contact sales".</p>
   </div>
   <div class="card-container" style="padding: var(--padding-6x);">
     <h3 style="margin-bottom: var(--padding-4x);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -108,8 +110,8 @@
 <rect width="24" height="24" fill="white"/>
 </clipPath>
 </defs>
-</svg> Flexible Plans</h3>
-    <p style="color: var(--value-color);">Monthly, or yearly SaaS plans, plus the always-free self-host path for full ownership.</p>
+</svg> Free Forever, Apache 2.0</h3>
+    <p style="color: var(--value-color);">No per-check pricing, no monthly quota, no surprise bill when you go viral. Use it commercially, fork it, ship it — the code is yours.</p>
   </div>
   <div class="card-container" style="padding: var(--padding-6x);">
     <h3 style="margin-bottom: var(--padding-4x);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -126,7 +128,68 @@
 </clipPath>
 </defs>
 </svg> Self-Host Anywhere</h3>
-    <p style="color: var(--value-color);">Run on your own server, your VPS, or your edge runtime. Full source, zero third-party dependencies.</p>
+    <p style="color: var(--value-color);">Run it on your own server, a cheap VPS, a container, or an edge runtime. Zero third-party dependencies, zero vendor lock-in — port it and go.</p>
+  </div>
+</div>
+
+<div style="text-align: center; margin-bottom: var(--padding-12x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Why teams choose to self-host</h2>
+  <p style="color: var(--value-color); margin-bottom: var(--padding-8x); max-width: 640px; margin-left: auto; margin-right: auto;">When you run Menta yourself, CAPTCHA stops being a dependency you rent and becomes an asset you own.</p>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--padding-8x); text-align: left;">
+    <div class="card-container" style="padding: var(--padding-6x);">
+      <h4 style="margin-bottom: var(--padding-2x);">Your data stays yours</h4>
+      <p style="color: var(--value-color); margin: 0;">No third party ever sees your traffic, your users, or your logs. Nothing to share, nothing to breach.</p>
+    </div>
+    <div class="card-container" style="padding: var(--padding-6x);">
+      <h4 style="margin-bottom: var(--padding-2x);">Predictable cost: zero</h4>
+      <p style="color: var(--value-color); margin: 0;">Unlimited challenges and unlimited domains. No per-verification fees that scale with your traffic.</p>
+    </div>
+    <div class="card-container" style="padding: var(--padding-6x);">
+      <h4 style="margin-bottom: var(--padding-2x);">Total control</h4>
+      <p style="color: var(--value-color); margin: 0;">Tune difficulty, retention, and behavior in your own code. Audit every line, patch it yourself, on your schedule.</p>
+    </div>
+  </div>
+</div>
+
+<div style="margin-bottom: var(--padding-12x);">
+  <h2 style="margin-bottom: var(--padding-6x); text-align: center;">Menta vs. the big-name CAPTCHAs</h2>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th class="th">&nbsp;</th>
+          <th class="th">Big-name CAPTCHA</th>
+          <th class="th">Menta (self-hosted)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="td">Where your users' data goes</td>
+          <td class="td">A third party's cloud</td>
+          <td class="td"><strong>Your server, only — you control it</strong></td>
+        </tr>
+        <tr>
+          <td class="td">Pricing</td>
+          <td class="td">Per check, with quotas</td>
+          <td class="td"><strong>Free, unlimited — on your server</strong></td>
+        </tr>
+        <tr>
+          <td class="td">User experience</td>
+          <td class="td">Image puzzles, endless clicks</td>
+          <td class="td"><strong>One click, invisible work</strong></td>
+        </tr>
+        <tr>
+          <td class="td">Cookies &amp; tracking</td>
+          <td class="td">Vendor-defined</td>
+          <td class="td"><strong>None by default</strong></td>
+        </tr>
+        <tr>
+          <td class="td">Vendor lock-in</td>
+          <td class="td">High</td>
+          <td class="td"><strong>None — Apache 2.0 source</strong></td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -135,26 +198,34 @@
   <div style="max-width: 600px; margin: 0 auto;">
     <div style="margin-bottom: var(--padding-6x);">
       <h4 style="margin-bottom: var(--padding-2x);">1. Challenge</h4>
-      <p style="color: var(--value-color);">Server creates a unique challenge with a random salt and target difficulty.</p>
+      <p style="color: var(--value-color);">Your server creates a unique challenge with a random salt and a target difficulty.</p>
     </div>
     <div style="margin-bottom: var(--padding-6x);">
       <h4 style="margin-bottom: var(--padding-2x);">2. Solve</h4>
-      <p style="color: var(--value-color);">Client finds a nonce that makes SHA-256(salt + nonce) meet the target.</p>
+      <p style="color: var(--value-color);">The visitor's browser finds a nonce that makes SHA-256(salt + nonce) hit the target — trivial for a human, costly for a bot.</p>
     </div>
     <div style="margin-bottom: var(--padding-6x);">
       <h4 style="margin-bottom: var(--padding-2x);">3. Verify</h4>
-      <p style="color: var(--value-color);">Server verifies the proof and issues a signed session token.</p>
+      <p style="color: var(--value-color);">Your server verifies the proof and issues a signed session token. Validation takes under a millisecond.</p>
     </div>
   </div>
   <a href="/how-it-works" class="button" style="margin-top: var(--padding-4x);">Learn more</a>
 </div>
 
+<div class="container" style="padding: 0 0 var(--padding-8x); max-width: 760px; margin: 0 auto;">
+  <div class="card-container" style="padding: var(--padding-6x); border-left: 4px solid var(--color-primary);">
+    <h3 style="margin-bottom: var(--padding-3x);">⚠️ Tested on PythonAnywhere only</h3>
+    <p style="color: var(--value-color);">Menta has been tested <strong>exclusively on PythonAnywhere</strong>. It should run on any platform that supports Python, but if something breaks on your setup — or if you have ideas, suggestions, or feature requests — please open an issue on GitHub. Community feedback is what keeps this project improving.</p>
+    <p style="margin: 0;"><a href="https://github.com/livrasand/mentacaptcha/issues" class="button">Report a bug or suggest an idea on GitHub</a></p>
+  </div>
+</div>
+
 <div style="text-align: center; padding: var(--padding-8x); border-top: 1px solid var(--color-background-shade);">
-  <h2 style="margin-bottom: var(--padding-4x);">Ready to get started?</h2>
-  <p style="color: var(--value-color); margin-bottom: var(--padding-6x);">45-day free trial. No credit card required.</p>
+  <h2 style="margin-bottom: var(--padding-4x);">Ready to own your bot defense?</h2>
+  <p style="color: var(--value-color); margin-bottom: var(--padding-6x); max-width: 620px; margin-left: auto; margin-right: auto;">Self-host Menta for free — full source, unlimited challenges, zero telemetry. Your data never leaves your infrastructure.</p>
   <div style="display: flex; gap: var(--padding-4x); justify-content: center; flex-wrap: wrap;">
-    <a href="/account" class="button" style="padding: var(--padding-3x) var(--padding-6x);">Create Account</a>
     <a href="https://github.com/livrasand/mentacaptcha" class="button" style="padding: var(--padding-3x) var(--padding-6x);">Self-host (Free)</a>
+    <a href="/demo" class="button" style="padding: var(--padding-3x) var(--padding-6x);">Try Demo</a>
   </div>
 </div>
 

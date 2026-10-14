@@ -24,7 +24,7 @@ Ser el estándar de CAPTCHA por defecto para quienes prefieren soberanía de dat
 - **Privacidad por diseño.** Minimizar datos, anonimizar IPs por defecto y cifrar en reposo y tránsito.
 - **Transparencia.** Código abierto, políticas claras y sin terceros invisibles.
 - **Accesibilidad.** El widget debe ser usable con teclado, lectores de pantalla y sin dependencias de movimiento.
-- **Soberanía.** SaaS para quien quiere conveniencia; self-hosted para quien quiere control total.
+- **Soberanía.** Self-hosted: despliegue en su propio servidor para tener control total.
 - **Cumplimiento sin concesiones.** Cumplir GDPR, CCPA, PIPEDA/CPPA, LGPD, DPDPA, PIPL y estar listo para HIPAA, sin sacrificar la experiencia.
 - **Simplicidad.** Un clic, una prueba de trabajo, un token. Sin puzzles visuales.
 
@@ -62,7 +62,7 @@ Cada nueva función, endpoint o dependencia se pregunta:
 2. ¿Puede funcionar sin cookies y sin localStorage?
 3. ¿Respalda accesibilidad y WCAG 2.2 AA?
 4. ¿Cumple con GDPR, CCPA, LGPD, PIPL, DPDPA y está listo para HIPAA?
-5. ¿Mantiene la opción self-hosted intacta?
+5. ¿Permite el despliegue autoalojable (self-hosted) en su propio servidor?
 
 Si una propuesta rompe cualquiera de estas respuestas, se rechaza o se rediseña.
 

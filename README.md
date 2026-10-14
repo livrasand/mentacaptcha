@@ -58,7 +58,7 @@ Customize theme, layout, typography, accents, and internationalization via stand
 | `data-cap-font-size` | Label font size | `16px` |
 | `data-cap-font-weight` | Label font weight | `400` |
 | `data-cap-text-color` | Label text color | `#333` / `#e6e6e6` |
-| `data-cap-primary-color` | Brand accent color | `#22C55E` |
+| `data-cap-primary-color` | Brand accent color | `#22C45E` |
 | `data-cap-checkmark-color` | Checkmark color | Same as primary |
 | `data-cap-spinner-color` | Spinner loader color | `#757575` |
 | `data-cap-brand-color` | Brand link color | `#757575` |
@@ -85,8 +85,8 @@ Customize theme, layout, typography, accents, and internationalization via stand
   data-cap-width="340px"
   data-cap-height="64px"
   data-cap-border-radius="12px"
-  data-cap-border-color="#22C55E"
-  data-cap-primary-color="#22C55E"
+  data-cap-border-color="#22C45E"
+  data-cap-primary-color="#22C45E"
   data-cap-background="#121212"
   data-cap-text-color="#f0f0f0"
   data-cap-font-family="'Inter', sans-serif"

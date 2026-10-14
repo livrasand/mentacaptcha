@@ -98,7 +98,6 @@ def get_client_ip():
 DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), "menta.db"))
 DB_ENCRYPTION_KEY = os.environ.get('DB_ENCRYPTION_KEY', '')
 DATA_RETENTION_HOURS = int(os.environ.get('DATA_RETENTION_HOURS', 24))
-ACCOUNT_INACTIVITY_DAYS = int(os.environ.get('ACCOUNT_INACTIVITY_DAYS', 30))
 LOG_IP_FULL = os.environ.get('LOG_IP_FULL', 'false').lower() in ('1', 'true', 'yes', 'on')
 
 CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '')
@@ -124,11 +123,8 @@ SHIELD_CLEARANCE_TTL = int(os.environ.get('SHIELD_CLEARANCE_TTL', '86400'))
 # Dificultad del PoW invisible del shield (4 ceros ≈ ~70k hashes ≈ <2s en JS).
 SHIELD_DIFFICULTY = os.environ.get('SHIELD_DIFFICULTY', '0000')
 
-TRIAL_DAYS = int(os.environ.get('TRIAL_DAYS', 45))
-DOMAIN_COOLDOWN_DAYS = int(os.environ.get('DOMAIN_COOLDOWN_DAYS', 182))
-SUPPORT_INACTIVITY_DAYS = int(os.environ.get('SUPPORT_INACTIVITY_DAYS', 30))
-NTFY_BASE_URL = os.environ.get('NTFY_BASE_URL', 'https://ntfy.sh').rstrip('/')
-NTFY_ADMIN_TOPIC = os.environ.get('NTFY_ADMIN_TOPIC', '')
+# Días de inactividad tras los cuales se purgan cuentas y dominios obsoletos.
+ACCOUNT_INACTIVITY_DAYS = int(os.environ.get('ACCOUNT_INACTIVITY_DAYS', 365))
 
 
 def get_db():
@@ -201,11 +197,6 @@ def init_db():
                 tenant_id TEXT NOT NULL DEFAULT '',
                 domains TEXT NOT NULL DEFAULT '',
                 primary_domain TEXT NOT NULL DEFAULT '',
-                plan TEXT NOT NULL DEFAULT 'beginner',
-                status TEXT NOT NULL DEFAULT 'trial',
-                trial_started_at REAL,
-                payment_activated_at REAL,
-                ntfy_topic TEXT,
                 totp_secret TEXT,
                 created_at REAL NOT NULL,
                 last_seen_at REAL NOT NULL,
@@ -225,29 +216,6 @@ def init_db():
             )
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_domain_history ON domain_history(account_number, status, last_active_at)")
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS support_tickets (
-                id TEXT PRIMARY KEY,
-                account_number TEXT,
-                ntfy_topic TEXT,
-                subject TEXT NOT NULL,
-                message TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'open',
-                created_at REAL NOT NULL,
-                last_reply_at REAL
-            )
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_support_tickets ON support_tickets(status, created_at)")
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS support_replies (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticket_id TEXT NOT NULL,
-                author TEXT NOT NULL,
-                body TEXT NOT NULL,
-                created_at REAL NOT NULL
-            )
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_support_replies ON support_replies(ticket_id, created_at)")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS admin_2fa (
                 id INTEGER PRIMARY KEY,
@@ -329,20 +297,17 @@ def _migrate():
         cols2 = {r[1] for r in conn.execute("PRAGMA table_info(solved_challenges)").fetchall()}
         if "solve_time" not in cols2:
             conn.execute("ALTER TABLE solved_challenges ADD COLUMN solve_time REAL NOT NULL DEFAULT 30")
-        # Tenant separation for SaaS
+        # Tenant separation for self-hosted multi-site deployments
         for table in ["challenges", "rate_limits", "solved_challenges", "sessions", "failed_attempts"]:
             cols = {r[1] for r in conn.execute("PRAGMA table_info(%s)" % table).fetchall()}
             if "tenant_id" not in cols:
                 conn.execute("ALTER TABLE %s ADD COLUMN tenant_id TEXT NOT NULL DEFAULT ''" % table)
-        # Accounts trial/payment columns
+        # Accounts columns
         cols_accounts = {r[1] for r in conn.execute("PRAGMA table_info(accounts)").fetchall()}
-        for col in ["primary_domain", "plan", "status", "ntfy_topic", "totp_secret"]:
+        for col in ["primary_domain", "totp_secret"]:
             if col not in cols_accounts:
                 conn.execute("ALTER TABLE accounts ADD COLUMN %s TEXT" % col)
-        for col in ["trial_started_at", "payment_activated_at"]:
-            if col not in cols_accounts:
-                conn.execute("ALTER TABLE accounts ADD COLUMN %s REAL" % col)
-        # New tables for domain anti-bypass and support tickets
+        # New tables for domain anti-bypass
         conn.execute("""
             CREATE TABLE IF NOT EXISTS domain_history (
                 domain_root TEXT PRIMARY KEY,
@@ -350,34 +315,10 @@ def _migrate():
                 first_seen_at REAL NOT NULL,
                 last_active_at REAL NOT NULL,
                 status TEXT NOT NULL DEFAULT 'active',
-                release_after REAL,
-                paid INTEGER NOT NULL DEFAULT 0
+                release_after REAL
             )
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_domain_history ON domain_history(account_number, status, last_active_at)")
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS support_tickets (
-                id TEXT PRIMARY KEY,
-                account_number TEXT,
-                ntfy_topic TEXT,
-                subject TEXT NOT NULL,
-                message TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'open',
-                created_at REAL NOT NULL,
-                last_reply_at REAL
-            )
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_support_tickets ON support_tickets(status, created_at)")
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS support_replies (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticket_id TEXT NOT NULL,
-                author TEXT NOT NULL,
-                body TEXT NOT NULL,
-                created_at REAL NOT NULL
-            )
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_support_replies ON support_replies(ticket_id, created_at)")
         cols_aal = {r[1] for r in conn.execute("PRAGMA table_info(admin_access_log)").fetchall()}
         if "admin_access_log" not in {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}:
             conn.execute("""
@@ -430,24 +371,19 @@ def _cleanup():
                 ("domain_history", "last_active_at", ACCOUNT_INACTIVITY_DAYS * 86400),
             ]:
                 conn.execute("DELETE FROM %s WHERE %s < ?" % (table, col), (now - window,))
-            # Support tickets are deleted after SUPPORT_INACTIVITY_DAYS of inactivity
-            # (last reply or, if none, ticket creation), then their replies are purged too.
-            cutoff = now - (SUPPORT_INACTIVITY_DAYS * 86400)
-            conn.execute("DELETE FROM support_tickets WHERE COALESCE(last_reply_at, created_at) < ?", (cutoff,))
-            conn.execute("DELETE FROM support_replies WHERE ticket_id NOT IN (SELECT id FROM support_tickets)")
         print("[CLEANUP] Expired data removed")
     except Exception as e:
         print("[CLEANUP ERROR] %s" % e)
 _cleanup()
 
 def current_tenant():
-    """Identificador de tenant para separación por API key en SaaS."""
+    """Identificador de tenant para separación por API key."""
     return getattr(g, 'tenant_id', '')
 
 
 @app.before_request
 def set_tenant():
-    """Lee el tenant desde el header X-API-Key o, en SaaS, dedúcelo del origen CORS."""
+    """Lee el tenant desde el header X-API-Key."""
     api_key = request.headers.get('X-API-Key', '')
     if api_key:
         g.tenant_id = api_key
@@ -455,38 +391,6 @@ def set_tenant():
         origin = request.headers.get('Origin')
         account = get_account_by_origin(origin) if origin else None
         g.tenant_id = account['account_number'] if account else ''
-
-
-def _get_account_auth():
-    """Extrae el número de cuenta de Authorization Bearer o X-API-Key.
-    Si el token es un JWT de sesión, lo decodifica y devuelve (account_number, verified).
-    Si es un número de cuenta directo, devuelve (account_number, False).
-    """
-    auth = request.headers.get('Authorization', '')
-    token = request.headers.get('X-API-Key', '')
-    if auth.startswith('Bearer '):
-        token = auth[7:].strip()
-    if not token:
-        return '', False
-    # Try JWT session token
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-        if payload.get('type') == 'account_session':
-            return payload.get('account_number', ''), True
-    except Exception:
-        pass
-    # Raw account number (allowed only if account has no 2FA, verified below)
-    return token, False
-
-
-def _issue_account_token(account_number, verified=True, expires=86400):
-    """Emite un JWT de sesión para una cuenta."""
-    now = time.time()
-    return jwt.encode(
-        {'type': 'account_session', 'account_number': account_number, 'verified': verified, 'iat': now, 'exp': now + expires},
-        SECRET_KEY,
-        algorithm='HS256'
-    )
 
 
 def generate_account_number():
@@ -571,16 +475,6 @@ def _count_valid_domains(domains):
     return count
 
 
-def _check_domain_plan_limit(domains, plan):
-    """Devuelve (None) si el plan permite los dominios, o (response, status) si excede."""
-    if plan == 'developer':
-        return None
-    count = _count_valid_domains(domains)
-    if count > 1:
-        return jsonify({"error": "Beginner plan allows only 1 domain. Upgrade to Developer for unlimited domains."}), 400
-    return None
-
-
 def domain_overlap(a, b):
     """Verifica si dos nombres de dominio se solapan (igual, subdominio o padre)."""
     if not a or not b:
@@ -593,7 +487,7 @@ def domain_overlap(a, b):
 
 
 def get_account_by_origin(origin):
-    """Busca la cuenta SaaS activa asociada a un origen CORS usando el historial de dominios."""
+    """Busca la cuenta activa asociada a un origen CORS usando el historial de dominios."""
     if not origin:
         return None
     host = normalize_domain(origin)
@@ -668,86 +562,6 @@ def is_origin_allowed(tenant_id, origin):
     return origin in allowed
 
 
-def check_account_status(tenant_id):
-    """Verifica si una cuenta SaaS puede usar los endpoints protegidos."""
-    if not tenant_id:
-        return {'ok': True}
-    account = get_account(tenant_id)
-    if not account:
-        return {'ok': True}  # self-hosted no requiere cuenta
-    now = time.time()
-    status = account['status']
-    trial_started_raw = account['trial_started_at']
-    try:
-        trial_started = float(trial_started_raw) if trial_started_raw else 0
-    except (ValueError, TypeError):
-        trial_started = 0
-    trial_expires = trial_started + (TRIAL_DAYS * 86400)
-    days_left = int((trial_expires - now) / 86400) if status == 'trial' else 0
-
-    if status == 'active':
-        return {'ok': True, 'status': 'active', 'days_left': None}
-    if status == 'trial':
-        if now < trial_expires:
-            return {'ok': True, 'status': 'trial', 'days_left': max(0, days_left)}
-        # Trial expired; move to expired and lock domain
-        _expire_account(tenant_id)
-        return {
-            'ok': False,
-            'status': 'expired',
-            'days_left': 0,
-            'error': 'Trial expired. Contact support to activate your account.',
-            'support_url': '/support?subject=trial-expired'
-        }
-    if status == 'pending_claim':
-        return {
-            'ok': False,
-            'status': 'pending_claim',
-            'days_left': 0,
-            'error': 'Account pending domain verification. Open a support claim.',
-            'support_url': '/support?subject=domain-claim'
-        }
-    if status in ('expired', 'suspended'):
-        return {
-            'ok': False,
-            'status': status,
-            'days_left': 0,
-            'error': 'Account inactive. Contact support to reactivate.',
-            'support_url': '/support?subject=account-reactivate'
-        }
-    return {'ok': True}
-
-
-def _expire_account(account_number):
-    """Marca una cuenta como expirada y bloquea su dominio durante el periodo de cooldown."""
-    try:
-        now = time.time()
-        release = now + (DOMAIN_COOLDOWN_DAYS * 86400)
-        with get_db() as conn:
-            conn.execute(
-                "UPDATE accounts SET status = 'expired' WHERE account_number = ?",
-                (account_number,)
-            )
-            conn.execute(
-                "UPDATE domain_history SET status = 'locked', release_after = ? WHERE account_number = ? AND status = 'active'",
-                (release, account_number)
-            )
-    except Exception:
-        pass
-
-
-def _release_domain(domain_root):
-    """Libera un dominio del historial para permitir nuevo registro."""
-    try:
-        with get_db() as conn:
-            conn.execute(
-                "UPDATE domain_history SET status = 'released', release_after = NULL WHERE domain_root = ?",
-                (domain_root,)
-            )
-    except Exception:
-        pass
-
-
 def check_domain_conflict(domain_root, account_number=None):
     """Verifica si un dominio ya está registrado."""
     if not domain_root:
@@ -761,19 +575,6 @@ def check_domain_conflict(domain_root, account_number=None):
                 if domain_overlap(domain_root, row['domain_root']):
                     if account_number and row['account_number'] == account_number:
                         continue
-                    # if locked, check if it was paid
-                    if row['status'] == 'locked':
-                        release = row['release_after'] or 0
-                        days_inactive = int((time.time() - (release - DOMAIN_COOLDOWN_DAYS * 86400)) / 86400) if release else 0
-                        return {
-                            'type': 'locked',
-                            'domain': row['domain_root'],
-                            'account_number': row['account_number'],
-                            'paid': bool(row['paid']),
-                            'days_inactive': days_inactive,
-                            'release_after': release,
-                            'days_until_release': int((release - time.time()) / 86400) if release > time.time() else 0
-                        }
                     return {
                         'type': 'active',
                         'domain': row['domain_root'],
@@ -797,30 +598,6 @@ def _register_domain_for_account(account_number, domain_root, paid=False, status
             )
     except Exception:
         pass
-
-
-def _notify_ntfy(topic, message, link=None):
-    """Envía una notificación a un topic de ntfy."""
-    if not topic:
-        return
-    try:
-        url = NTFY_BASE_URL + '/' + urllib.parse.quote(topic, safe='')
-        headers = {'Content-Type': 'text/plain; charset=utf-8'}
-        if link:
-            headers['Actions'] = 'view, Open, ' + link
-        payload = message.encode('utf-8')
-        req = urllib.request.Request(url, data=payload, headers=headers, method='POST')
-        urllib.request.urlopen(req, timeout=10)
-    except Exception:
-        pass
-
-
-def _support_link(ticket_id, request=None):
-    """Construye el enlace secreto a un ticket."""
-    host = ''
-    if request:
-        host = request.host_url.rstrip('/')
-    return host + '/support/' + ticket_id
 
 
 def check_proxy_misconfiguration():
@@ -1077,7 +854,6 @@ def enforce_proxy_and_cors():
                 "success": False,
                 "error": "This domain is not registered or authorized by Menta.",
                 "origin": origin,
-                "support_url": "/support?subject=domain-not-authorized"
             }), 403
         return None
 
@@ -1091,7 +867,6 @@ def enforce_proxy_and_cors():
             "success": False,
             "error": "This domain is not registered or authorized by Menta.",
             "origin": origin,
-            "support_url": "/support?subject=domain-not-authorized"
         }), 403
 
 
@@ -1295,19 +1070,10 @@ def sign_challenge(challenge_id, salt, target, expires):
     return _hmac("%s.%s.%s.%s" % (challenge_id, salt, target, expires))
 
 
-
 @app.route('/dashboard')
 def dashboard():
     return render_template('dashboard.html', admin_token_required=bool(ADMIN_TOKEN))
 
-
-@app.route('/account')
-def account():
-    return render_template('account.html')
-
-@app.route('/pricing')
-def pricing():
-    return render_template('pricing.html')
 
 @app.route('/demo')
 def demo():
@@ -1358,6 +1124,15 @@ def scripts(filename):
 def index():
     return render_template('index.html')
 
+
+@app.errorhandler(404)
+def not_found(error):
+    # Las peticiones a la API esperan JSON; las páginas reciben el template HTML.
+    if request.path.startswith(('/init', '/challenge', '/redeem', '/verify', '/shield/')) or \
+            request.accept_mimetypes.best == 'application/json':
+        return jsonify({"success": False, "error": "Not found"}), 404
+    return render_template('404.html'), 404
+
 @app.route('/init', methods=['POST'])
 def init_session():
     ip = get_client_ip()
@@ -1370,11 +1145,6 @@ def init_session():
     if shield_verdict['action'] == 'block':
         log_failure(ip, '/init', 'bot_shield_' + shield_verdict['reason'], tenant_id=tenant_id)
         return jsonify({"success": False, "error": "Suspicious activity detected."}), 403
-
-    status = check_account_status(tenant_id)
-    if not status['ok']:
-        log_failure(ip, '/init', 'account_' + status.get('status', 'inactive'), tenant_id=tenant_id)
-        return jsonify({"success": False, "error": status['error'], "support_url": status.get('support_url')}), 402
 
     ok, reason = check_browser_signals(tenant_id, origin)
     if not ok:
@@ -1411,11 +1181,6 @@ def get_challenge():
     ip = get_client_ip()
     tenant_id = current_tenant()
     origin = request.headers.get('Origin')
-
-    status = check_account_status(tenant_id)
-    if not status['ok']:
-        log_failure(ip, '/challenge', 'account_' + status.get('status', 'inactive'), tenant_id=tenant_id)
-        return jsonify({"success": False, "error": status['error'], "support_url": status.get('support_url')}), 402
 
     ok, reason = check_browser_signals(tenant_id, origin)
     if not ok:
@@ -1513,11 +1278,6 @@ def redeem():
     ip = get_client_ip()
     tenant_id = current_tenant()
     origin = request.headers.get('Origin')
-
-    status = check_account_status(tenant_id)
-    if not status['ok']:
-        log_failure(ip, '/redeem', 'account_' + status.get('status', 'inactive'), tenant_id=tenant_id)
-        return jsonify({"success": False, "error": status['error'], "support_url": status.get('support_url')}), 402
 
     ok, reason = check_browser_signals(tenant_id, origin)
     if not ok:
@@ -1758,11 +1518,6 @@ def verify_token():
     ip = get_client_ip()
     tenant_id = current_tenant()
 
-    status = check_account_status(tenant_id)
-    if not status['ok']:
-        log_failure(ip, '/verify', 'account_' + status.get('status', 'inactive'), tenant_id=tenant_id)
-        return jsonify({"success": False, "valid": False, "error": status['error'], "support_url": status.get('support_url')}), 402
-
     if not check_rate_limit(ip, '/verify', 20, 60, tenant_id=tenant_id):
         log_failure(ip, '/verify', 'rate_limit', tenant_id=tenant_id)
         return jsonify({"success": False, "valid": False, "error": "Too many requests. Try again later."}), 429
@@ -1813,16 +1568,10 @@ def verify_token():
 
 
 def _create_account_from_request(data):
-    """Crea una cuenta SaaS a partir de datos. Valida dominio y conflictos. Devuelve dict o tuple (response, status)."""
+    """Crea una cuenta de administración a partir de datos. Valida dominio y conflictos."""
     domains = data.get('domains', '')
     notes = data.get('notes', '')
-    plan = data.get('plan', 'beginner')
-    ntfy_topic = data.get('ntfy_topic', '')
     domains = _normalize_domains_input(domains)
-    # Enforce plan domain limit
-    limit_error = _check_domain_plan_limit(domains, plan)
-    if limit_error:
-        return limit_error
 
     # determine primary domain
     primary_input = data.get('primary_domain', '')
@@ -1830,7 +1579,7 @@ def _create_account_from_request(data):
         primary_input = domains.split(',')[0] if domains else ''
     primary_domain = normalize_domain(primary_input)
     if not primary_domain:
-        return jsonify({"error": "A valid domain is required for SaaS accounts"}), 400
+        return jsonify({"error": "A valid domain is required"}), 400
 
     # Check domain conflict across active/locked domains
     conflict = check_domain_conflict(primary_domain)
@@ -1838,45 +1587,24 @@ def _create_account_from_request(data):
         return jsonify({
             "error": "Domain already has an active owner.",
             "domain": conflict['domain'],
-            "support_url": '/support?subject=domain-claim'
         }), 409
 
     account_number = generate_account_number()
     now = time.time()
 
-    if conflict and conflict['type'] == 'locked':
-        # Previous domain registration exists; create account in pending_claim with warning
-        trial_started = None
-        status = 'pending_claim'
-        domain_alert = "This domain was previously registered in Menta. It has been inactive for %d day(s). Options: 1) log in with your old account, 2) wait %d days, or 3) open a support claim to validate ownership." % (
-            conflict.get('days_inactive', 0),
-            max(0, conflict.get('days_until_release', 0))
-        )
-    else:
-        trial_started = now
-        status = 'trial'
-        domain_alert = None
-
     with get_db() as conn:
         conn.execute(
-            "INSERT INTO accounts (account_number, tenant_id, domains, primary_domain, plan, status, trial_started_at, ntfy_topic, created_at, last_seen_at, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (account_number, account_number, domains, primary_domain, plan, status, trial_started, ntfy_topic, now, now, notes)
+            "INSERT INTO accounts (account_number, tenant_id, domains, primary_domain, created_at, last_seen_at, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (account_number, account_number, domains, primary_domain, now, now, notes)
         )
-    # Register domain for the account
-    if status == 'trial':
-        _register_domain_for_account(account_number, primary_domain, paid=False, status='active')
+    _register_domain_for_account(account_number, primary_domain, status='active')
 
-    response = {
+    return {
         "success": True,
         "account_number": account_number,
-        "status": status,
         "primary_domain": primary_domain,
-        "trial_days": TRIAL_DAYS if status == 'trial' else None,
         "warning": "Save this number. It will not be shown again."
     }
-    if domain_alert:
-        response["domain_alert"] = domain_alert
-    return response
 
 
 @app.route('/admin/account', methods=['POST'])
@@ -1893,132 +1621,9 @@ def create_account():
     return jsonify(result)
 
 
-@app.route('/account/register', methods=['POST'])
-def register_account():
-    """Registro self-service de una cuenta SaaS. No requiere token admin."""
-    ip = get_client_ip()
-    if not check_rate_limit(ip, '/account/register', 5, 3600):
-        return jsonify({"error": "Too many requests. Try again later."}), 429
-    data = request.get_json(silent=True) or {}
-    result = _create_account_from_request(data)
-    if isinstance(result, tuple):
-        return result
-    return jsonify(result)
-
-
-@app.route('/admin/account/login', methods=['POST'])
-def login_account():
-    """Login con número de cuenta. Si 2FA está configurado, requiere TOTP o recovery code. Devuelve un JWT session token."""
-    data = request.get_json(silent=True) or {}
-    account_number = data.get('account_number', '').strip()
-    code = (data.get('totp_code') or data.get('recovery_code') or '').strip()
-    if not account_number:
-        return jsonify({"error": "account_number required"}), 400
-    with get_db() as conn:
-        account = conn.execute("SELECT * FROM accounts WHERE account_number = ?", (account_number,)).fetchone()
-    if not account:
-        return jsonify({"error": "Unauthorized"}), 401
-    if account['totp_secret']:
-        if not code:
-            return jsonify({"error": "TOTP code or recovery code required"}), 403
-        totp = pyotp.TOTP(account['totp_secret'])
-        if not totp.verify(code, valid_window=1) and not _consume_recovery_code(account_number, code):
-            return jsonify({"error": "Invalid TOTP or recovery code"}), 401
-    update_account_last_seen(account_number)
-    status = check_account_status(account_number)
-    token = _issue_account_token(account_number, verified=True)
-    return jsonify({
-        "success": True,
-        "token": token,
-        "account": {
-            "domains": account["domains"],
-            "primary_domain": account["primary_domain"],
-            "plan": account["plan"],
-            "status": account["status"],
-            "trial_days_left": status.get('days_left'),
-            "created_at": account["created_at"],
-            "last_seen_at": account["last_seen_at"],
-            "notes": account["notes"],
-            "totp_enabled": bool(account['totp_secret'])
-        }
-    })
-
-
-def _require_account():
-    """Verifica autenticación de cuenta. Si 2FA está activado, requiere token de sesión verificado."""
-    account_number, verified = _get_account_auth()
-    if not account_number:
-        return None, jsonify({"error": "account_number required"}), 401
-    with get_db() as conn:
-        account = conn.execute("SELECT * FROM accounts WHERE account_number = ?", (account_number,)).fetchone()
-    if not account:
-        return None, jsonify({"error": "Unauthorized"}), 401
-    if account['totp_secret'] and not verified:
-        return None, jsonify({"error": "TOTP verification required"}), 403
-    return account, None, None
-
-
-@app.route('/admin/account', methods=['GET'])
-def get_account_info():
-    """Devuelve información de la cuenta autenticada."""
-    account, err, status = _require_account()
-    if err:
-        return err, status
-    account_number = account['account_number']
-    update_account_last_seen(account_number)
-    status = check_account_status(account_number)
-    return jsonify({
-        "success": True,
-        "account": {
-            "domains": account["domains"],
-            "primary_domain": account["primary_domain"],
-            "plan": account["plan"],
-            "status": account["status"],
-            "trial_days_left": status.get('days_left'),
-            "created_at": account["created_at"],
-            "last_seen_at": account["last_seen_at"],
-            "notes": account["notes"],
-            "totp_enabled": bool(account['totp_secret'])
-        }
-    })
-
-
-@app.route('/admin/account/activate', methods=['POST'])
-def activate_account():
-    """Activa manualmente una cuenta tras pago verificado (crypto). Requiere admin."""
-    ok, _, setup_required = _admin_authorized(readonly=False)
-    if not ok:
-        if setup_required:
-            return jsonify({"error": "Admin 2FA setup required", "setup_required": True}), 403
-        return jsonify({"error": "Unauthorized"}), 401
-    data = request.get_json(silent=True) or {}
-    account_number = data.get('account_number', '').strip()
-    plan = data.get('plan', 'beginner')
-    if not account_number:
-        return jsonify({"error": "account_number required"}), 400
-    with get_db() as conn:
-        account = conn.execute("SELECT * FROM accounts WHERE account_number = ?", (account_number,)).fetchone()
-    if not account:
-        return jsonify({"error": "Account not found"}), 404
-    now = time.time()
-    with get_db() as conn:
-        conn.execute(
-            "UPDATE accounts SET status = 'active', plan = ?, payment_activated_at = ?, trial_started_at = ? WHERE account_number = ?",
-            (plan, now, now, account_number)
-        )
-    # Unlock and mark domain as paid
-    _register_domain_for_account(account_number, account['primary_domain'], paid=True, status='active')
-    return jsonify({
-        "success": True,
-        "status": "active",
-        "account_number": account_number,
-        "plan": plan
-    })
-
-
 @app.route('/admin/account/<account_number>/delete', methods=['POST'])
 def delete_account(account_number):
-    """Elimina una cuenta SaaS y sus datos asociados. Requiere admin."""
+    """Elimina una cuenta y sus datos asociados. Requiere admin."""
     ok, _, setup_required = _admin_authorized(readonly=False)
     if not ok:
         if setup_required:
@@ -2034,8 +1639,6 @@ def delete_account(account_number):
         # Remove domain history and recovery codes
         conn.execute("DELETE FROM domain_history WHERE account_number = ?", (account_number,))
         conn.execute("DELETE FROM totp_recovery_codes WHERE owner = ?", (account_number,))
-        # Dissociate support tickets from account (keep tickets for audit)
-        conn.execute("UPDATE support_tickets SET account_number = NULL WHERE account_number = ?", (account_number,))
         # Delete account
         conn.execute("DELETE FROM accounts WHERE account_number = ?", (account_number,))
     return jsonify({"success": True, "account_number": account_number})
@@ -2049,313 +1652,18 @@ def list_accounts():
         if setup_required:
             return jsonify({"error": "Admin 2FA setup required", "setup_required": True}), 403
         return jsonify({"error": "Unauthorized"}), 401
-    status_filter = request.args.get('status', '')
     with get_db() as conn:
-        if status_filter:
-            rows = conn.execute("SELECT account_number, primary_domain, plan, status, trial_started_at, payment_activated_at, created_at, last_seen_at FROM accounts WHERE status = ? ORDER BY created_at DESC", (status_filter,)).fetchall()
-        else:
-            rows = conn.execute("SELECT account_number, primary_domain, plan, status, trial_started_at, payment_activated_at, created_at, last_seen_at FROM accounts ORDER BY created_at DESC").fetchall()
+        rows = conn.execute("SELECT account_number, primary_domain, created_at, last_seen_at, notes FROM accounts ORDER BY created_at DESC").fetchall()
     result = []
     for r in rows:
-        s = check_account_status(r['account_number'])
         result.append({
             "account_number": r['account_number'],
             "primary_domain": r['primary_domain'],
-            "plan": r['plan'],
-            "status": r['status'],
-            "trial_days_left": s.get('days_left'),
             "created_at": r['created_at'],
             "last_seen_at": r['last_seen_at'],
-            "payment_activated_at": r['payment_activated_at']
+            "notes": r['notes']
         })
     return jsonify({"success": True, "accounts": result})
-
-
-@app.route('/admin/account/domains', methods=['POST'])
-def update_account_domains():
-    """Actualiza los dominios permitidos de una cuenta."""
-    account, err, status = _require_account()
-    if err:
-        return err, status
-    account_number = account['account_number']
-    plan = account['plan']
-    data = request.get_json(silent=True) or {}
-    domains = data.get('domains', '')
-    domains = _normalize_domains_input(domains)
-    # Enforce plan domain limit
-    limit_error = _check_domain_plan_limit(domains, plan)
-    if limit_error:
-        return limit_error
-    # Validate no new domain conflicts with another active account
-    for d in domains.split(','):
-        if not d:
-            continue
-        host = normalize_domain(d)
-        if not host:
-            continue
-        conflict = check_domain_conflict(host, account_number=account_number)
-        if conflict and conflict['type'] == 'active' and conflict['account_number'] != account_number:
-            return jsonify({"error": "Domain conflict with another account", "domain": host}), 409
-    with get_db() as conn:
-        conn.execute("UPDATE accounts SET domains = ? WHERE account_number = ?", (domains, account_number))
-    # Register each domain in domain_history so get_account_by_origin can resolve the tenant
-    for d in domains.split(','):
-        host = normalize_domain(d)
-        if host:
-            _register_domain_for_account(account_number, host, paid=(plan != 'beginner'), status='active')
-    update_account_last_seen(account_number)
-    return jsonify({"success": True, "domains": domains})
-
-
-@app.route('/admin/account/totp/status', methods=['GET'])
-def account_totp_status():
-    """Devuelve el estado de 2FA de la cuenta."""
-    account, err, status = _require_account()
-    if err:
-        return err, status
-    return jsonify({"success": True, "enabled": bool(account['totp_secret'])})
-
-
-@app.route('/admin/account/totp/setup', methods=['POST'])
-def account_totp_setup():
-    """Inicia configuración de 2FA para una cuenta; devuelve secret y QR."""
-    account, err, status = _require_account()
-    if err:
-        return err, status
-    if account['totp_secret']:
-        return jsonify({"error": "2FA already configured"}), 400
-    secret = pyotp.random_base32()
-    uri = pyotp.totp.TOTP(secret).provisioning_uri(name=account['account_number'], issuer_name='Menta')
-    qr = _qr_svg(uri)
-    return jsonify({"success": True, "secret": secret, "qr": qr, "uri": uri})
-
-
-@app.route('/admin/account/totp/verify', methods=['POST'])
-def account_totp_verify():
-    """Verifica un código TOTP y habilita 2FA para la cuenta."""
-    account, err, status = _require_account()
-    if err:
-        return err, status
-    data = request.get_json(silent=True) or {}
-    secret = (data.get('secret') or '').strip()
-    code = (data.get('code') or '').strip()
-    if not secret or not code:
-        return jsonify({"error": "secret and code required"}), 400
-    if not pyotp.TOTP(secret).verify(code, valid_window=1):
-        return jsonify({"error": "Invalid code"}), 400
-    codes = _generate_recovery_codes(account['account_number'])
-    with get_db() as conn:
-        conn.execute("UPDATE accounts SET totp_secret = ? WHERE account_number = ?", (secret, account['account_number']))
-    return jsonify({"success": True, "recovery_codes": codes, "enabled": True})
-
-
-@app.route('/admin/account/totp/disable', methods=['POST'])
-def account_totp_disable():
-    """Deshabilita 2FA para la cuenta."""
-    account, err, status = _require_account()
-    if err:
-        return err, status
-    data = request.get_json(silent=True) or {}
-    code = (data.get('code') or '').strip()
-    if not code:
-        return jsonify({"error": "code required"}), 400
-    if account['totp_secret']:
-        if not pyotp.TOTP(account['totp_secret']).verify(code, valid_window=1) and not _consume_recovery_code(account['account_number'], code):
-            return jsonify({"error": "Invalid TOTP or recovery code"}), 401
-    with get_db() as conn:
-        conn.execute("UPDATE accounts SET totp_secret = NULL WHERE account_number = ?", (account['account_number'],))
-        conn.execute("DELETE FROM totp_recovery_codes WHERE owner = ?", (account['account_number'],))
-    return jsonify({"success": True, "enabled": False})
-
-
-@app.route('/admin/account/totp/recovery', methods=['POST'])
-def account_totp_recovery():
-    """Usa un recovery code para obtener un session token de cuenta."""
-    data = request.get_json(silent=True) or {}
-    account_number = data.get('account_number', '').strip()
-    code = (data.get('recovery_code') or '').strip()
-    if not account_number or not code:
-        return jsonify({"error": "account_number and recovery_code required"}), 400
-    with get_db() as conn:
-        account = conn.execute("SELECT * FROM accounts WHERE account_number = ?", (account_number,)).fetchone()
-    if not account:
-        return jsonify({"error": "Unauthorized"}), 401
-    if not _consume_recovery_code(account_number, code):
-        return jsonify({"error": "Invalid recovery code"}), 401
-    update_account_last_seen(account_number)
-    token = _issue_account_token(account_number, verified=True)
-    return jsonify({"success": True, "token": token})
-
-
-@app.route('/support', methods=['GET'])
-def support_page():
-    """Página de soporte anónimo."""
-    return render_template('support.html')
-
-
-@app.route('/support/<ticket_id>')
-def view_ticket_page(ticket_id):
-    """Página para ver un ticket por su enlace secreto."""
-    return render_template('support.html', ticket_id=ticket_id)
-
-
-@app.route('/support/ticket', methods=['POST'])
-def create_ticket():
-    """Crea un ticket de soporte anónimo."""
-    data = request.get_json(silent=True) or {}
-    subject = (data.get('subject') or '').strip()
-    message = (data.get('message') or '').strip()
-    ntfy_topic = (data.get('ntfy_topic') or '').strip()
-    account_number = (data.get('account_number') or '').strip()
-    if not subject or not message:
-        return jsonify({"error": "subject and message are required"}), 400
-    ticket_id = secrets.token_urlsafe(16)
-    now = time.time()
-    with get_db() as conn:
-        conn.execute(
-            "INSERT INTO support_tickets (id, account_number, ntfy_topic, subject, message, status, created_at, last_reply_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (ticket_id, account_number or None, ntfy_topic or None, subject, message, 'open', now, now)
-        )
-    link = _support_link(ticket_id, request)
-    # Notify user that ticket was created
-    if ntfy_topic:
-        _notify_ntfy(ntfy_topic, "Tu ticket de soporte ha sido creado. Guarda este enlace:", link)
-    # Notify admin of new ticket
-    if NTFY_ADMIN_TOPIC:
-        _notify_ntfy(NTFY_ADMIN_TOPIC, "Nuevo ticket de soporte: %s" % subject, link)
-    return jsonify({
-        "success": True,
-        "ticket_id": ticket_id,
-        "link": link,
-        "message": "Save this secret link. It will not be shown again."
-    })
-
-
-@app.route('/support/ticket/<ticket_id>', methods=['GET'])
-def get_ticket(ticket_id):
-    """Devuelve un ticket y sus respuestas por el enlace secreto."""
-    with get_db() as conn:
-        ticket = conn.execute("SELECT * FROM support_tickets WHERE id = ?", (ticket_id,)).fetchone()
-        if not ticket:
-            return jsonify({"error": "Ticket not found"}), 404
-        replies = conn.execute("SELECT * FROM support_replies WHERE ticket_id = ? ORDER BY created_at ASC", (ticket_id,)).fetchall()
-    return jsonify({
-        "success": True,
-        "ticket": dict(ticket),
-        "replies": [dict(r) for r in replies]
-    })
-
-
-@app.route('/support/ticket/<ticket_id>/reply', methods=['POST'])
-def add_user_reply(ticket_id):
-    """Añade una respuesta de un usuario o del admin a un ticket."""
-    data = request.get_json(silent=True) or {}
-    body = (data.get('body') or '').strip()
-    if not body:
-        return jsonify({"error": "body is required"}), 400
-    auth = request.headers.get('Authorization', '')
-    is_admin = bool(ADMIN_TOKEN) and hmac.compare_digest(auth, 'Bearer ' + ADMIN_TOKEN)
-    with get_db() as conn:
-        ticket = conn.execute("SELECT * FROM support_tickets WHERE id = ?", (ticket_id,)).fetchone()
-        if not ticket:
-            return jsonify({"error": "Ticket not found"}), 404
-        if not is_admin and ticket['status'] == 'closed':
-            return jsonify({"error": "Ticket is closed"}), 403
-        author = 'admin' if is_admin else 'user'
-        conn.execute(
-            "INSERT INTO support_replies (ticket_id, author, body, created_at) VALUES (?, ?, ?, ?)",
-            (ticket_id, author, body, time.time())
-        )
-        conn.execute("UPDATE support_tickets SET last_reply_at = ? WHERE id = ?", (time.time(), ticket_id))
-    if ticket['ntfy_topic']:
-        link = _support_link(ticket_id, request)
-        _notify_ntfy(ticket['ntfy_topic'], "Tienes un nuevo mensaje en tu ticket de soporte.", link)
-    return jsonify({"success": True})
-
-
-@app.route('/admin/support/tickets', methods=['GET'])
-def list_support_tickets():
-    """Lista tickets de soporte para administración."""
-    ok, _, setup_required = _admin_authorized(readonly=True)
-    if not ok:
-        if setup_required:
-            return jsonify({"error": "Admin 2FA setup required", "setup_required": True}), 403
-        return jsonify({"error": "Unauthorized"}), 401
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT id, account_number, subject, status, created_at, last_reply_at FROM support_tickets ORDER BY created_at DESC"
-        ).fetchall()
-    return jsonify({"success": True, "tickets": [dict(r) for r in rows]})
-
-
-@app.route('/admin/support/ticket/<ticket_id>', methods=['GET'])
-def admin_get_ticket(ticket_id):
-    """Devuelve un ticket para administración."""
-    ok, _, setup_required = _admin_authorized(readonly=True)
-    if not ok:
-        if setup_required:
-            return jsonify({"error": "Admin 2FA setup required", "setup_required": True}), 403
-        return jsonify({"error": "Unauthorized"}), 401
-    with get_db() as conn:
-        ticket = conn.execute("SELECT * FROM support_tickets WHERE id = ?", (ticket_id,)).fetchone()
-        if not ticket:
-            return jsonify({"error": "Ticket not found"}), 404
-        replies = conn.execute("SELECT * FROM support_replies WHERE ticket_id = ? ORDER BY created_at ASC", (ticket_id,)).fetchall()
-    return jsonify({"success": True, "ticket": dict(ticket), "replies": [dict(r) for r in replies]})
-
-
-@app.route('/admin/support/ticket/<ticket_id>/reply', methods=['POST'])
-def admin_reply_ticket(ticket_id):
-    """Añade una respuesta del admin a un ticket y notifica al usuario."""
-    ok, _, setup_required = _admin_authorized(readonly=False)
-    if not ok:
-        if setup_required:
-            return jsonify({"error": "Admin 2FA setup required", "setup_required": True}), 403
-        return jsonify({"error": "Unauthorized"}), 401
-    data = request.get_json(silent=True) or {}
-    body = (data.get('body') or '').strip()
-    if not body:
-        return jsonify({"error": "body is required"}), 400
-    with get_db() as conn:
-        ticket = conn.execute("SELECT * FROM support_tickets WHERE id = ?", (ticket_id,)).fetchone()
-        if not ticket:
-            return jsonify({"error": "Ticket not found"}), 404
-        conn.execute(
-            "INSERT INTO support_replies (ticket_id, author, body, created_at) VALUES (?, ?, ?, ?)",
-            (ticket_id, 'admin', body, time.time())
-        )
-        conn.execute("UPDATE support_tickets SET last_reply_at = ?, status = 'open' WHERE id = ?", (time.time(), ticket_id))
-    if ticket['ntfy_topic']:
-        link = _support_link(ticket_id, request)
-        _notify_ntfy(ticket['ntfy_topic'], "Tienes un nuevo mensaje en tu ticket de soporte.", link)
-    return jsonify({"success": True})
-
-
-@app.route('/admin/support/ticket/<ticket_id>/close', methods=['POST'])
-def admin_close_ticket(ticket_id):
-    """Cierra un ticket de soporte."""
-    ok, _, setup_required = _admin_authorized(readonly=False)
-    if not ok:
-        if setup_required:
-            return jsonify({"error": "Admin 2FA setup required", "setup_required": True}), 403
-        return jsonify({"error": "Unauthorized"}), 401
-    with get_db() as conn:
-        conn.execute("UPDATE support_tickets SET status = 'closed' WHERE id = ?", (ticket_id,))
-    return jsonify({"success": True})
-
-
-@app.route('/admin/support/ticket/<ticket_id>/delete', methods=['POST'])
-def admin_delete_ticket(ticket_id):
-    """Elimina un ticket de soporte y sus respuestas."""
-    ok, _, setup_required = _admin_authorized(readonly=False)
-    if not ok:
-        if setup_required:
-            return jsonify({"error": "Admin 2FA setup required", "setup_required": True}), 403
-        return jsonify({"error": "Unauthorized"}), 401
-    with get_db() as conn:
-        conn.execute("DELETE FROM support_replies WHERE ticket_id = ?", (ticket_id,))
-        conn.execute("DELETE FROM support_tickets WHERE id = ?", (ticket_id,))
-    return jsonify({"success": True})
 
 
 @app.route('/admin/metrics', methods=['GET'])
@@ -2581,7 +1889,7 @@ WIDGET_JS = r"""class CapWidget extends HTMLElement {
                 msg.classList.add('protected');
                 msg.style.display = 'block';
             }
-            console.warn('[Menta protection] This website is not registered or authorized by Menta.', { status, endpoint, origin, support_url: data.support_url, error: data.error });
+            console.warn('[Menta protection] This website is not registered or authorized by Menta.', { status, endpoint, origin, error: data.error });
         } else {
             label.innerText = this.i18n('error', 'Error. Try again.');
             if (msg) {
@@ -2615,11 +1923,11 @@ WIDGET_JS = r"""class CapWidget extends HTMLElement {
 .spinner { display:none; width:18px; height:18px; border:2px solid #f3f3f3; border-top:2px solid #333; border-radius:50%; animation:spin 1s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 @keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
-.solved .checkbox { background:#f0f0f0; border-color:#4CAF50; }
-.solved .checkbox::after { content:'\u2713'; color:#4CAF50; font-weight:bold; }
-.mint-accent { fill: #2ECC71; color: #2ECC71; }
+.solved .checkbox { background:#f0f0f0; border-color:#22c45e; }
+.solved .checkbox::after { content:'\u2713'; color:#22c45e; font-weight:bold; }
+.mint-accent { fill: #22c45e; color: #22c45e; }
 .message { display:none; margin-top:6px; font-size:11px; color:#757575; max-width:300px; line-height:1.4; }
-.message.protected { color:#2ECC71; }
+.message.protected { color:#22c45e; }
 </style>
 <div class="container" id="box" role="button" tabindex="0" aria-label="${initialLabel}" aria-live="polite" aria-atomic="true" dir="${dir}">
   <div class="checkbox" id="check" aria-hidden="true"><div class="spinner" id="spin"></div></div>
@@ -2766,7 +2074,7 @@ SHIELD_JS = r"""(function () {
         'html.menta-shield-pending .menta-shield-hide{filter:blur(6px);pointer-events:none;user-select:none}' +
         '#menta-shield-overlay{position:fixed;inset:0;background:#fff;z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}' +
         '.ms-card{text-align:center;padding:2rem 2.5rem;border-radius:12px;border:1px solid #e0e0e0;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.08);max-width:320px}' +
-        '.ms-spin{width:28px;height:28px;border:3px solid #f0f0f0;border-top-color:#2ECC71;border-radius:50%;margin:0 auto 1rem;animation:ms-spin 1s linear infinite}' +
+        '.ms-spin{width:28px;height:28px;border:3px solid #f0f0f0;border-top-color:#22c45e;border-radius:50%;margin:0 auto 1rem;animation:ms-spin 1s linear infinite}' +
         '@keyframes ms-spin{to{transform:rotate(360deg)}}' +
         '@media (prefers-reduced-motion:reduce){.ms-spin{animation:none}}' +
         '.ms-title{font-size:15px;font-weight:600;color:#333;margin:0 0 .4rem}.ms-msg{font-size:12px;color:#757575;margin:0;line-height:1.5}';
@@ -2880,7 +2188,6 @@ SHIELD_JS = r"""(function () {
         run();
     }
 })();"""
-
 
 
 if __name__ == '__main__':

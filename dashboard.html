@@ -19,7 +19,7 @@
 
 <div style="text-align: center; margin-bottom: var(--padding-12x);">
   <h1 style="margin-bottom: var(--padding-4x);">Admin Dashboard</h1>
-  <p style="color: var(--value-color);">Monitor metrics, manage accounts, and handle support tickets.</p>
+  <p style="color: var(--value-color);">Monitor metrics and manage accounts.</p>
 </div>
 
 <div id="admin-login-form" class="card-container" style="max-width: 500px; margin: 0 auto var(--padding-12x); padding: var(--padding-8x);">
@@ -74,14 +74,8 @@
 <div id="admin-section" style="display:none;">
   <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
     <h2 style="margin-bottom: var(--padding-4x);">Accounts</h2>
-    <p style="color: var(--value-color); margin-bottom: var(--padding-6x);">Manage customer accounts, activate subscriptions, and remove accounts.</p>
+    <p style="color: var(--value-color); margin-bottom: var(--padding-6x);">Manage accounts and remove accounts as needed.</p>
     <div id="accounts-list"></div>
-  </div>
-
-  <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6px);">
-    <h2 style="margin-bottom: var(--padding-4x);">Support Tickets</h2>
-    <p style="color: var(--value-color); margin-bottom: var(--padding-6x);">View and respond to anonymous support tickets from users.</p>
-    <div id="tickets-list"></div>
   </div>
 
   <div class="card-container" style="padding: var(--padding-6x);">
@@ -256,7 +250,7 @@
       resultEl.innerHTML = '<strong>2FA enabled.</strong> Save these recovery codes, they will not be shown again:<br><code>' + (data.recovery_codes || []).join('</code> <code>') + '</code>';
       resultEl.style.display = 'block';
       document.getElementById('admin-2fa-setup').style.display = 'none';
-      if (await loadMetrics()) { loadAccounts(); loadTickets(); }
+      if (await loadMetrics()) { loadAccounts(); }
     } catch (e) {
       resultEl.textContent = e.message;
       resultEl.className = 'error';
@@ -279,22 +273,15 @@
       table.className = 'table-container';
       table.style.borderCollapse = 'collapse';
       table.style.width = '100%';
-      table.innerHTML = '<thead><tr><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Account</th><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Domain</th><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Plan</th><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Status</th><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Trial Left</th><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Actions</th></tr></thead>';
+      table.innerHTML = '<thead><tr><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Account</th><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Domain</th><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Actions</th></tr></thead>';
       for (const a of data.accounts) {
         const tr = document.createElement('tr');
         tr.innerHTML = '<td style="padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);"><span data-identifier="' + a.account_number + '" data-what="account"></span></td>' +
           '<td style="padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);"><span data-identifier="' + a.primary_domain + '" data-what="domain"></span></td>' +
-          '<td style="padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);">' + a.plan + '</td>' +
-          '<td style="padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);">' + a.status + '</td>' +
-          '<td style="padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);">' + (a.trial_days_left != null ? a.trial_days_left + 'd' : '-') + '</td>' +
-          '<td style="padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);"><button class="activate" data-acc="' + a.account_number + '" data-plan="' + a.plan + '">Activate</button> ' +
-          '<button class="delete-account" data-acc="' + a.account_number + '">Delete</button></td>';
+          '<td style="padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);"><button class="delete-account" data-acc="' + a.account_number + '">Delete</button></td>';
         table.appendChild(tr);
       }
       el.appendChild(table);
-      for (const btn of el.querySelectorAll('.activate')) {
-        btn.addEventListener('click', (e) => activateAccount(e.target.dataset.acc, e.target.dataset.plan));
-      }
       for (const btn of el.querySelectorAll('.delete-account')) {
         btn.addEventListener('click', (e) => deleteAccount(e.target.dataset.acc));
       }
@@ -304,22 +291,7 @@
     }
   }
 
-  async function activateAccount(accountNumber, plan) {
-    if (!accountNumber) return;
-    try {
-      const r = await fetch('/admin/account/activate', {
-        method: 'POST',
-        headers: adminHeaders(true),
-        body: JSON.stringify({ account_number: accountNumber, plan: plan })
-      });
-      const data = await r.json();
-      if (!r.ok) handleAdminError(r, data);
-      alert('Account activated: ' + accountNumber);
-      loadAccounts();
-    } catch (e) {
-      alert(e.message);
-    }
-  }
+
 
   async function deleteAccount(accountNumber) {
     if (!accountNumber) return;
@@ -338,77 +310,12 @@
     }
   }
 
-  async function loadTickets() {
-    const el = document.getElementById('tickets-list');
-    el.innerHTML = '';
-    try {
-      const r = await fetch('/admin/support/tickets', { headers: adminHeaders() });
-      const data = await r.json();
-      if (!r.ok) handleAdminError(r, data);
-      if (!data.tickets.length) {
-        el.innerHTML = '<p style="color: var(--value-color);">No support tickets.</p>';
-        return;
-      }
-      const ul = document.createElement('ul');
-      const adminToken = tokenEl.value.trim();
-      const tokenQuery = adminToken ? '?token=' + encodeURIComponent(adminToken) : '';
-      for (const t of data.tickets) {
-        const li = document.createElement('li');
-        li.style.marginBottom = 'var(--padding-3x)';
-        li.innerHTML = '<a href="/support/' + encodeURIComponent(t.id) + tokenQuery + '" target="_blank">' + t.subject + '</a> (' + t.status + ') — ' + new Date(t.created_at * 1000).toLocaleString() +
-          ' <button type="button" class="close-ticket" data-id="' + t.id + '">Close</button>' +
-          ' <button type="button" class="delete-ticket" data-id="' + t.id + '">Delete</button>';
-        ul.appendChild(li);
-      }
-      el.appendChild(ul);
-      for (const btn of el.querySelectorAll('.close-ticket')) {
-        btn.addEventListener('click', (e) => closeTicket(e.target.dataset.id));
-      }
-      for (const btn of el.querySelectorAll('.delete-ticket')) {
-        btn.addEventListener('click', (e) => deleteTicket(e.target.dataset.id));
-      }
-    } catch (e) {
-      el.textContent = 'Unable to load tickets: ' + e.message;
-    }
-  }
-
-  async function closeTicket(ticketId) {
-    if (!ticketId) return;
-    try {
-      const r = await fetch('/admin/support/ticket/' + encodeURIComponent(ticketId) + '/close', {
-        method: 'POST',
-        headers: adminHeaders()
-      });
-      const data = await r.json();
-      if (!r.ok) handleAdminError(r, data);
-      loadTickets();
-    } catch (e) {
-      alert(e.message);
-    }
-  }
-
-  async function deleteTicket(ticketId) {
-    if (!ticketId) return;
-    if (!confirm('Delete this ticket and all its replies?')) return;
-    try {
-      const r = await fetch('/admin/support/ticket/' + encodeURIComponent(ticketId) + '/delete', {
-        method: 'POST',
-        headers: adminHeaders()
-      });
-      const data = await r.json();
-      if (!r.ok) handleAdminError(r, data);
-      loadTickets();
-    } catch (e) {
-      alert(e.message);
-    }
-  }
-
-  document.getElementById('token').addEventListener('keydown', async (e) => { if (e.key === 'Enter') { saveRememberedToken(); if (await loadMetrics()) { loadAccounts(); loadTickets(); } } });
-  document.getElementById('load').addEventListener('click', async () => { saveRememberedToken(); if (await loadMetrics()) { loadAccounts(); loadTickets(); } });
+  document.getElementById('token').addEventListener('keydown', async (e) => { if (e.key === 'Enter') { saveRememberedToken(); if (await loadMetrics()) { loadAccounts(); } } });
+  document.getElementById('load').addEventListener('click', async () => { saveRememberedToken(); if (await loadMetrics()) { loadAccounts(); } });
   document.getElementById('verify-admin-2fa').addEventListener('click', verifyAdmin2FA);
   document.getElementById('remember-token').addEventListener('change', () => { if (!rememberEl.checked) clearRememberedToken(); });
   loadRememberedToken();
-  loadMetrics(true).then(success => { if (success) { loadAccounts(); loadTickets(); } });
+  loadMetrics(true).then(success => { if (success) { loadAccounts(); } });
 </script>
 
 </body>

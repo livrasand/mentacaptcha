@@ -89,7 +89,7 @@ class CapWidget extends HTMLElement {
             shadow: '0 2px 4px rgba(0,0,0,0.05)', link: '#757575', linkHover: '#333333',
             brand: '#757575', focus: '#333333', spinner: '#757575'
         };
-        const primary = a('primary-color', '#2ECC71');
+        const primary = a('primary-color', '#22c45e');
         return {
             theme,
             fontFamily: a('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'),
@@ -156,7 +156,7 @@ class CapWidget extends HTMLElement {
                 msg.classList.add('protected');
                 msg.style.display = 'block';
             }
-            console.warn('[Menta protection] This website is not registered or authorized by Menta.', { status, endpoint, origin, support_url: data.support_url, error: data.error });
+            console.warn('[Menta protection] This website is not registered or authorized by Menta.', { status, endpoint, origin, error: data.error });
         } else {
             label.innerText = this.i18n('error', 'Error. Try again.');
             if (msg) {
