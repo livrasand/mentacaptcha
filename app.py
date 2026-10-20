@@ -1125,6 +1125,16 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/verify', methods=['GET'])
+@app.route('/challenge-page', methods=['GET'])
+def challenge_page():
+    """Página de verificación humana (intersticial tipo Cloudflare Challenge
+    Page): resuelve un PoW invisible vía /shield/check + /shield/redeem y
+    redirige a `?next=` (solo rutas del mismo origen) tras guardar el clearance.
+    """
+    return render_template('challenge.html')
+
+
 @app.errorhandler(404)
 def not_found(error):
     # Las peticiones a la API esperan JSON; las páginas reciben el template HTML.
@@ -1406,9 +1416,15 @@ def shield_check():
         log_failure(ip, '/shield/check', 'bot_shield_' + verdict['reason'], tenant_id=SHIELD_TENANT)
         return jsonify({"success": False, "action": "block"}), 403
 
-    if verdict['action'] == 'shield' and verdict.get('difficulty_hint') == 'max':
-        # Impersonador de bot o script genérico con JS: PoW invisible duro.
-        log_failure(ip, '/shield/check', 'bot_shield_' + verdict['reason'], tenant_id=SHIELD_TENANT)
+    # `force` (página de verificación humana): emite el PoW aunque el veredicto
+    # sea allow, para poder forzar el reto manualmente.
+    force_challenge = bool(data.get('force'))
+
+    if (verdict['action'] == 'shield' and verdict.get('difficulty_hint') == 'max') or force_challenge:
+        # Impersonador de bot o script genérico con JS: PoW invisible duro
+        # (o reto forzado desde la página de verificación).
+        if not force_challenge:
+            log_failure(ip, '/shield/check', 'bot_shield_' + verdict['reason'], tenant_id=SHIELD_TENANT)
         challenge_id = secrets.token_hex(16)
         salt = secrets.token_hex(8)
         target = _max_difficulty(SHIELD_DIFFICULTY, MIN_DIFFICULTY)
