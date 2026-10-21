@@ -1470,7 +1470,8 @@ ADMIN_TOKEN_READONLY = os.environ.get("ADMIN_TOKEN_READONLY", '')
 
 def _admin_authorized(readonly=False, skip_totp=False):
     """Valida token de admin. readonly=True permite el token de solo lectura.
-    Cuando 2FA admin está configurado, requiere además X-Admin-TOTP o X-Admin-Recovery-Code.
+    Cuando 2FA admin está configurado, requiere además X-Admin-TOTP o X-Admin-Recovery-Code,
+    a menos que exista una sesión recordada activa.
     skip_totp permite endpoints de setup 2FA sin código TOTP.
     """
     auth = request.headers.get('Authorization', '')
@@ -1485,9 +1486,17 @@ def _admin_authorized(readonly=False, skip_totp=False):
     if skip_totp:
         if token_type:
             return True, token_type, False
+        # Check remembered session for setup endpoints
+        required_type = 'full' if not readonly else None
+        if _admin_session_valid(required_type):
+            return True, session.get('admin_token_type', 'full'), False
         return False, None, False
 
     if not token_type:
+        # Check remembered session
+        required_type = 'full' if not readonly else None
+        if _admin_session_valid(required_type):
+            return True, session.get('admin_token_type', 'full'), False
         return False, None, False
 
     # TOTP admin
@@ -1496,12 +1505,51 @@ def _admin_authorized(readonly=False, skip_totp=False):
         totp = request.headers.get('X-Admin-TOTP', '')
         recovery = request.headers.get('X-Admin-Recovery-Code', '')
         if totp and pyotp.TOTP(admin_secret).verify(totp, valid_window=1):
+            remember = request.headers.get('X-Remember-Me', 'false').lower() == 'true'
+            _refresh_admin_session(token_type, remember)
             return True, token_type, False
         if recovery and _consume_recovery_code('__admin__', recovery):
+            remember = request.headers.get('X-Remember-Me', 'false').lower() == 'true'
+            _refresh_admin_session(token_type, remember)
+            return True, token_type, False
+        # Check remembered session for this token
+        if _admin_session_valid(token_type):
             return True, token_type, False
         return False, None, False
     # No admin 2FA configured -> force setup
     return False, None, True
+
+
+def _admin_session_valid(token_type=None):
+    """Verifica si existe una sesión de admin recordada activa."""
+    try:
+        session_token = session.get('admin_token')
+        session_expires = session.get('admin_session_expires', 0)
+        if not session_token or not session_expires or session_expires < time.time():
+            return False
+        if session_token not in (ADMIN_TOKEN, ADMIN_TOKEN_READONLY):
+            return False
+        session_token_type = session.get('admin_token_type')
+        if token_type and session_token_type != token_type:
+            return False
+        return True
+    except Exception:
+        return False
+
+
+def _refresh_admin_session(token_type, remember=True):
+    """Refresca o crea la sesión de admin."""
+    try:
+        session['admin_token'] = ADMIN_TOKEN if token_type == 'full' else ADMIN_TOKEN_READONLY
+        session['admin_token_type'] = token_type
+        session['admin_2fa_verified'] = True
+        session['admin_session_expires'] = time.time() + (30 * 24 * 60 * 60)
+        if remember:
+            session.permanent = True
+        else:
+            session.permanent = False
+    except Exception:
+        pass
 
 
 
@@ -1588,6 +1636,35 @@ def sign_challenge(challenge_id, salt, target, expires):
     return _hmac("%s.%s.%s.%s" % (challenge_id, salt, target, expires))
 
 
+# Target imposible: SHA-256 produce 64 hex chars; 16 ceros son ~2^64 hashes.
+# Inalcanzable incluso para GPUs en un tiempo razonable.
+TARPIT_TARGET = '0' * 16
+TARPIT_EXPIRES = 3600  # 1 hora, así el bot no ve un "expired" rápido
+
+
+def _issue_tarpit_challenge(ip, tenant=SHIELD_TENANT):
+    challenge_id = secrets.token_hex(16)
+    salt = secrets.token_hex(8) + ':' + get_ip_prefix(ip)
+    ch_expires = time.time() + TARPIT_EXPIRES
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO challenges (id, tenant_id, salt, target, created_at, expires) VALUES (?,?,?,?,?,?)",
+            (challenge_id, tenant, salt, TARPIT_TARGET, time.time(), ch_expires)
+        )
+    return {
+        "success": True,
+        "action": "shield",
+        "tarpit": True,
+        "token": challenge_id,
+        "challenge": {
+            "salt": salt,
+            "target": TARPIT_TARGET,
+            "expires": ch_expires,
+            "challenge_signature": sign_challenge(challenge_id, salt, TARPIT_TARGET, ch_expires)
+        }
+    }
+
+
 @app.route('/dashboard')
 def dashboard():
     return render_template('dashboard.html', admin_token_required=bool(ADMIN_TOKEN))
@@ -1650,6 +1727,15 @@ def challenge_page():
     Page): resuelve un PoW invisible vía /shield/check + /shield/redeem y
     redirige a `?next=` (solo rutas del mismo origen) tras guardar el clearance.
     """
+    ua = request.headers.get('User-Agent', '')
+    ip = get_client_ip()
+    verdict = bot_shield.evaluate_request(
+        ua, ip, request.path,
+        request.headers.get('X-JA4-Fingerprint') or request.headers.get('X-JA3-Fingerprint')
+    )
+    if verdict['action'] in ('block', 'tarpit'):
+        # Página trampa: parece normal pero /shield/check devolverá el PoW imposible
+        return render_template('challenge.html')
     return render_template('challenge.html')
 
 
@@ -1739,6 +1825,12 @@ def get_challenge():
     if shield_verdict['action'] == 'block':
         log_failure(ip, '/challenge', 'bot_shield_' + shield_verdict['reason'], tenant_id=tenant_id)
         return jsonify({"success": False, "error": "Suspicious activity detected."}), 403
+
+    # NUEVO: tarpit — el bot recibe un PoW imposible en vez de uno normal
+    if shield_verdict['action'] == 'tarpit':
+        log_failure(ip, '/challenge', 'bot_shield_tarpit', tenant_id=tenant_id)
+        return jsonify(_issue_tarpit_challenge(ip, tenant=tenant_id))
+
     # Solo forzamos PoW máximo para sospechosos confirmados por el shield
     # (impersonadores de bots, scripts genéricos). Un navegador normal también
     # recibe 'shield' como 'unverified_client', pero sin hint de dificultad.
@@ -1940,6 +2032,11 @@ def shield_check():
     if verdict['action'] == 'block':
         log_failure(ip, '/shield/check', 'bot_shield_' + verdict['reason'], tenant_id=SHIELD_TENANT)
         return jsonify({"success": False, "action": "block"}), 403
+
+    # NUEVO: tarpit para bots conocidos
+    if verdict['action'] == 'tarpit':
+        log_failure(ip, '/shield/check', 'bot_shield_tarpit', tenant_id=SHIELD_TENANT)
+        return jsonify(_issue_tarpit_challenge(ip))
 
     # `force` (página de verificación humana): emite el PoW aunque el veredicto
     # sea allow, para poder forzar el reto manualmente.
@@ -2258,10 +2355,18 @@ def metrics():
             "SELECT COUNT(*) FROM solved_challenges WHERE tenant_id = ?",
             (tenant_id,)
         ).fetchone()[0]
-        top_ips = [dict(r) for r in conn.execute(
+        top_ips_raw = conn.execute(
             "SELECT ip, COUNT(*) AS failures, MAX(timestamp) AS last_seen FROM failed_attempts WHERE tenant_id = ? " + ("AND timestamp > ?" if hours > 0 else "") + " GROUP BY ip ORDER BY failures DESC LIMIT 25",
             (tenant_id, cutoff) if hours > 0 else (tenant_id,)
-        ).fetchall()]
+        ).fetchall()
+        top_ips = []
+        for r in top_ips_raw:
+            item = dict(r)
+            geo = analytics.geolocate(item["ip"])
+            item["country"] = geo["country"]
+            item["country_code"] = geo["country_code"]
+            item["city"] = geo["city"]
+            top_ips.append(item)
         return jsonify({
             "hours": hours,
             "bot_ips": bot_detected,
@@ -2400,6 +2505,15 @@ def analytics_data():
             for r in geo_rows
         ]
 
+        city_rows = conn.execute(
+            "SELECT city, country, country_code, COUNT(*) AS requests FROM request_log WHERE " + where +
+            " GROUP BY city, country, country_code ORDER BY requests DESC LIMIT 25", params
+        ).fetchall()
+        cities = [
+            {"city": r["city"], "country": r["country"], "country_code": r["country_code"], "requests": r["requests"]}
+            for r in city_rows
+        ]
+
         ua_rows = conn.execute(
             "SELECT user_agent, COUNT(*) AS requests FROM request_log WHERE " + where +
             " GROUP BY user_agent ORDER BY requests DESC LIMIT 25", params
@@ -2442,6 +2556,7 @@ def analytics_data():
             "outcomes": outcomes,
             "cache": cache,
             "geo": geo,
+            "cities": cities,
             "browsers": browsers,
             "os": os_list,
             "devices": devices,
@@ -2573,10 +2688,43 @@ def admin_2fa_verify():
                 "INSERT INTO admin_2fa (id, secret, created_at, confirmed) VALUES (1, ?, ?, 1) ON CONFLICT(id) DO UPDATE SET secret=excluded.secret, created_at=excluded.created_at, confirmed=1",
                 (secret, time.time())
             )
+        remember = request.headers.get('X-Remember-Me', 'false').lower() == 'true'
+        _refresh_admin_session('full', remember)
         return jsonify({"success": True, "valid": True, "recovery_codes": codes})
     if _consume_recovery_code('__admin__', code):
+        remember = request.headers.get('X-Remember-Me', 'false').lower() == 'true'
+        _refresh_admin_session('full', remember)
         return jsonify({"success": True, "valid": True, "recovery": True})
     return jsonify({"success": False, "valid": False}), 400
+
+
+@app.route('/admin/access-log', methods=['GET'])
+def admin_access_log():
+    """Devuelve el log de accesos de administración para auditoría."""
+    ok, _, setup_required = _admin_authorized(readonly=True)
+    if not ok:
+        if setup_required:
+            return jsonify({"error": "Admin 2FA setup required", "setup_required": True}), 403
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        limit = int(request.args.get('limit', '100'))
+    except (TypeError, ValueError):
+        limit = 100
+    limit = max(1, min(limit, 1000))
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT endpoint, token_type, ip, timestamp FROM admin_access_log ORDER BY timestamp DESC LIMIT ?",
+            (limit,)
+        ).fetchall()
+        log_items = []
+        for r in rows:
+            item = dict(r)
+            geo = analytics.geolocate(item["ip"])
+            item["country"] = geo["country"]
+            item["country_code"] = geo["country_code"]
+            item["city"] = geo["city"]
+            log_items.append(item)
+    return jsonify({"success": True, "log": log_items})
 
 
 @app.route('/menta-captcha.js')

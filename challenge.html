@@ -147,10 +147,14 @@
     var hashes = 0
     var difficulty = target.length
 
+    // Tarpit: si el target es >= 12 hex chars, el servidor está intentando
+    // quemar CPU de un bot conocido. Extendemos el timeout a 24 h.
+    var TIMEOUT_MS = target.length >= 12 ? 24 * 60 * 60 * 1000 : 110000
+
     setMeta('Difficulty: ' + difficulty + ' leading zeros.')
 
     function step () {
-      if (Date.now() - t0 > 110000) {
+      if (Date.now() - t0 > TIMEOUT_MS) {
         return Promise.reject(new Error('timeout'))
       }
       return crypto.subtle.digest('SHA-256', encoder.encode(salt + String(nonce))).then(function (digest) {

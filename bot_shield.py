@@ -258,13 +258,24 @@ def tls_fingerprint_mismatch(user_agent, tls_fingerprint):
     return tls_fingerprint.strip() not in allowed
 
 
+TARPIT_KNOWN_BOTS = os.environ.get('TARPIT_KNOWN_BOTS', 'true').lower() in ('1', 'true', 'yes', 'on')
+
+
 def evaluate_request(user_agent, ip, path, tls_fingerprint=None):
     bot = classify_ua(user_agent)
     policy = get_policy()
 
     if bot:
-        allowed_by_robots = policy.can_fetch(bot["name"], path)
         verified = verify_bot_ip(bot, ip)
+        tarpit_active = TARPIT_KNOWN_BOTS and os.environ.get('TARPIT_KNOWN_BOTS', 'true').lower() in ('1', 'true', 'yes', 'on')
+        if tarpit_active:
+            # Cualquier bot conocido (aunque respete robots.txt) va a tarpit:
+            # nunca lo dejamos pasar, y le servimos un PoW imposible.
+            return {"action": "tarpit", "reason": "known_bot_tarpit",
+                    "bot": bot["name"], "verified": verified,
+                    "difficulty_hint": "tarpit"}
+
+        allowed_by_robots = policy.can_fetch(bot["name"], path)
 
         if allowed_by_robots:
             return {"action": "allow", "reason": "known_bot_compliant", "bot": bot["name"],

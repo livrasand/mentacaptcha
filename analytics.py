@@ -3,14 +3,15 @@
 Reglas de diseno:
   * Las IPs crudas nunca se persisten. La identidad del visitante es un
     pseudonimo HMAC truncado, estable por sal pero no reversible.
-  * La geolocalizacion se resuelve en memoria (MaxMind GeoLite2 City) y solo se
-    guardan los campos gruesos (pais, region, ciudad).
+  * La geolocalizacion se resuelve en memoria (MaxMind GeoLite2 City / Country) y
+    solo se guardan los campos gruesos (pais, region, ciudad).
   * Todo degrada de forma segura si falta la dependencia opcional ``geoip2``
-    o la base de datos GeoLite2.
+    o las bases de datos GeoLite2.
 """
 
 import hashlib
 import hmac
+import ipaddress
 import os
 import random
 import re
@@ -45,20 +46,6 @@ def should_sample():
         return False
     return random.random() < rate
 
-
-def geoip_db_path():
-    """Ruta de la base de datos GeoLite2 (vacia si no se configura).
-
-    Las rutas relativas se resuelven desde el directorio del proyecto para que
-    funcionen con independencia del directorio de trabajo del proceso.
-    """
-    path = os.environ.get('GEOIP_DB_PATH', '').strip()
-    if not path:
-        return ''
-    if not os.path.isabs(path):
-        base = os.path.dirname(os.path.abspath(__file__))
-        path = os.path.join(base, path)
-    return path
 
 # Expresiones regulares de deteccion.
 _BOT_RE = re.compile(
@@ -110,45 +97,132 @@ def pseudonym_label(ip_hash):
 
 # --- GeoIP -----------------------------------------------------------------
 
-_geoip_reader = None
-_geoip_unavailable = False
+_geoip_city_reader = None
+_geoip_country_reader = None
+_geoip_initialized = False
+_city_db_path = ''
+_country_db_path = ''
+
+
+def _resolve_path(path):
+    if not path:
+        return ''
+    path = path.strip()
+    if not os.path.isabs(path):
+        base = os.path.dirname(os.path.abspath(__file__))
+        path = os.path.join(base, path)
+    return path if os.path.isfile(path) else ''
+
+
+def _init_geoip_readers():
+    """Inicializa perezosamente los lectores de GeoIP (City y Country)."""
+    global _geoip_city_reader, _geoip_country_reader, _geoip_initialized, _city_db_path, _country_db_path
+    if _geoip_initialized:
+        return
+    _geoip_initialized = True
+
+    try:
+        import geoip2.database  # type: ignore
+    except ImportError:
+        return
+
+    base = os.path.dirname(os.path.abspath(__file__))
+
+    # Candidatos para base de datos de ciudad
+    city_candidates = [
+        os.environ.get('GEOIP_CITY_DB_PATH', ''),
+        os.environ.get('GEOIP_DB_PATH', ''),
+        os.path.join(base, 'geoip', 'GeoLite2-City.mmdb'),
+        os.path.join(base, 'GeoLite2-City.mmdb'),
+    ]
+
+    # Candidatos para base de datos de pais
+    country_candidates = [
+        os.environ.get('GEOIP_COUNTRY_DB_PATH', ''),
+        os.path.join(base, 'geoip', 'GeoLite2-Country.mmdb'),
+        os.path.join(base, 'GeoLite2-Country.mmdb'),
+    ]
+
+    resolved_city = ''
+    for cand in city_candidates:
+        r = _resolve_path(cand)
+        if r:
+            resolved_city = r
+            break
+
+    resolved_country = ''
+    for cand in country_candidates:
+        r = _resolve_path(cand)
+        if r:
+            resolved_country = r
+            break
+
+    # Intentar abrir la base de ciudad
+    if resolved_city:
+        try:
+            reader = geoip2.database.Reader(resolved_city)
+            db_type = getattr(reader.metadata(), 'database_type', '')
+            if 'City' in db_type:
+                _geoip_city_reader = reader
+                _city_db_path = resolved_city
+            elif 'Country' in db_type:
+                _geoip_country_reader = reader
+                _country_db_path = resolved_city
+        except Exception:
+            pass
+
+    # Intentar abrir la base de pais si no se abrio antes
+    if resolved_country and _geoip_country_reader is None:
+        try:
+            reader = geoip2.database.Reader(resolved_country)
+            db_type = getattr(reader.metadata(), 'database_type', '')
+            if 'Country' in db_type:
+                _geoip_country_reader = reader
+                _country_db_path = resolved_country
+            elif 'City' in db_type and _geoip_city_reader is None:
+                _geoip_city_reader = reader
+                _city_db_path = resolved_country
+        except Exception:
+            pass
+
+
+def geoip_db_path():
+    """Ruta de la base de datos GeoLite2 (City o Country)."""
+    _init_geoip_readers()
+    return _city_db_path or _country_db_path or ''
+
+
+def geoip_city_db_path():
+    """Ruta de la base de datos GeoLite2 City."""
+    _init_geoip_readers()
+    return _city_db_path or ''
+
+
+def geoip_country_db_path():
+    """Ruta de la base de datos GeoLite2 Country."""
+    _init_geoip_readers()
+    return _country_db_path or ''
 
 
 def geoip_available():
     """Indica si la resolucion GeoIP esta disponible en este proceso."""
-    return _get_geoip_reader() is not None
+    _init_geoip_readers()
+    return _geoip_city_reader is not None or _geoip_country_reader is not None
 
 
 def _get_geoip_reader():
-    """Carga perezosa del lector GeoLite2 City (opcional)."""
-    global _geoip_reader, _geoip_unavailable
-    if _geoip_reader is not None or _geoip_unavailable:
-        return _geoip_reader
-    db_path = geoip_db_path()
-    if not db_path:
-        _geoip_unavailable = True
-        return None
-    try:
-        import geoip2.database  # type: ignore
-    except ImportError:
-        _geoip_unavailable = True
-        return None
-    try:
-        if not os.path.exists(db_path):
-            _geoip_unavailable = True
-            return None
-        _geoip_reader = geoip2.database.Reader(db_path)
-    except Exception:
-        _geoip_unavailable = True
-        _geoip_reader = None
-    return _geoip_reader
+    """Compatibilidad: devuelve el lector de ciudad o de pais."""
+    _init_geoip_readers()
+    return _geoip_city_reader or _geoip_country_reader
 
 
 def geolocate(ip):
     """Resuelve la geografia aproximada de una IP en memoria.
 
     Devuelve un dict con ``country``, ``country_code``, ``region`` y ``city``.
-    Ante IPs privadas, ausentes o sin base de datos, todo queda como ``Unknown``.
+    Detecta IPs de loopback y redes privadas (LAN/Localhost) para evitar
+    mostrar "Unknown" en entornos locales.
+    Usa la base de datos de ciudad (GeoLite2-City) y/o pais (GeoLite2-Country).
     """
     result = {
         'country': UNKNOWN,
@@ -156,22 +230,66 @@ def geolocate(ip):
         'region': UNKNOWN,
         'city': UNKNOWN,
     }
-    reader = _get_geoip_reader()
-    if reader is None or not ip or ip == 'unknown':
+    if not ip or ip == 'unknown':
         return result
+
+    # Deteccion de IPs privadas, loopback o especiales (incluyendo prefijos /XX)
     try:
-        response = reader.city(str(ip))
-    except Exception:
-        return result
-    try:
-        country = response.country
-        result['country'] = country.name or UNKNOWN
-        result['country_code'] = country.iso_code or UNKNOWN
-        subdivision = response.subdivisions.most_specific if response.subdivisions else None
-        result['region'] = (subdivision.name if subdivision else None) or UNKNOWN
-        result['city'] = response.city.name or UNKNOWN
-    except Exception:
+        ip_str = str(ip).strip()
+        # Eliminar puerto (ej. "1.2.3.4:8080")
+        if ':' in ip_str and not ip_str.startswith('[') and ip_str.count(':') == 1:
+            ip_str = ip_str.split(':')[0]
+        # Eliminar prefijo CIDR (ej. "127.0.0.0/24") -> usar la IP de red para clasificar
+        if '/' in ip_str:
+            ip_str = ip_str.split('/')[0]
+        ip_obj = ipaddress.ip_address(ip_str)
+        if ip_obj.is_loopback:
+            return {
+                'country': 'Localhost',
+                'country_code': 'LOCAL',
+                'region': 'Loopback',
+                'city': 'Localhost',
+            }
+        if ip_obj.is_private:
+            return {
+                'country': 'Private Network',
+                'country_code': 'LAN',
+                'region': 'Private Network',
+                'city': 'LAN',
+            }
+        # Para la consulta GeoIP usar la IP sin prefijo
+        ip = ip_str
+    except ValueError:
         pass
+
+    _init_geoip_readers()
+
+    # 1. Intentar con la base de datos de ciudad (contiene pais, region y ciudad)
+    if _geoip_city_reader is not None:
+        try:
+            response = _geoip_city_reader.city(str(ip))
+            if response.country:
+                result['country'] = response.country.name or UNKNOWN
+                result['country_code'] = response.country.iso_code or UNKNOWN
+            if response.subdivisions:
+                subdivision = response.subdivisions.most_specific
+                if subdivision and subdivision.name:
+                    result['region'] = subdivision.name
+            if response.city and response.city.name:
+                result['city'] = response.city.name
+        except Exception:
+            pass
+
+    # 2. Si el pais sigue desconocido, probar con la base de pais
+    if result['country'] == UNKNOWN and _geoip_country_reader is not None:
+        try:
+            response = _geoip_country_reader.country(str(ip))
+            if response.country:
+                result['country'] = response.country.name or UNKNOWN
+                result['country_code'] = response.country.iso_code or UNKNOWN
+        except Exception:
+            pass
+
     return result
 
 

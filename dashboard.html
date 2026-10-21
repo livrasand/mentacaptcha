@@ -10,116 +10,581 @@
 <script src="/js/header.js" defer></script>
 <script src="/js/copy.js" defer></script>
 <script src="/js/identifier.js" defer></script>
+<style>
+  /* ---- Dashboard components (built on the Menta design tokens) ---- */
+  .dash-wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: var(--padding-12x) var(--padding-6x) var(--padding-12x);
+  }
+
+  .dash-head { text-align: center; margin-bottom: var(--padding-8x); }
+  .dash-head h1 { margin-bottom: var(--padding-2x); }
+  .dash-head p { color: var(--value-color); margin: 0; }
+
+  .dash-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--padding-3x);
+    margin-bottom: var(--padding-6x);
+  }
+  .dash-metric {
+    background: var(--color-card);
+    border: 1px solid var(--color-card-contrast);
+    border-radius: var(--border-radius);
+    padding: var(--padding-3x);
+  }
+  .dash-metric .dash-label {
+    font-size: var(--font-size-ultra-small);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--value-color);
+    margin-bottom: var(--padding-1x);
+  }
+  .dash-metric .dash-value {
+    font-size: 1.75rem;
+    font-weight: var(--font-weight-bold);
+    line-height: 1.15;
+    color: var(--color-body-contrast);
+    word-break: normal;
+  }
+  .dash-metric .sub {
+    font-size: var(--font-size-ultra-small);
+    color: var(--value-color);
+    margin-top: var(--padding-0_5x);
+  }
+  .dash-metric.is-error .dash-value { color: var(--color-error); }
+  .dash-metric.is-success .dash-value { color: var(--color-success); }
+
+  .dash-wrap label:not(.options) {
+    display: block;
+    margin: var(--padding-2x) 0 var(--padding-0_5x);
+    font-size: var(--font-size-small);
+  }
+  .dash-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--padding-3x);
+    margin-bottom: var(--padding-3x);
+  }
+  .dash-toolbar h2 { margin: 0; }
+  .dash-toolbar .actions { display: flex; gap: var(--padding-2x); align-items: center; flex-wrap: wrap; }
+  .dash-toolbar select { width: auto; min-width: 8rem; margin: 0; }
+
+  .dash-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--padding-2x);
+    margin-bottom: var(--padding-4x);
+  }
+  .dash-tab { margin: 0; }
+  .dash-tab[aria-selected='true'] {
+    background: var(--color-primary);
+    color: var(--color-primary-contrast);
+    border-color: var(--color-primary);
+    box-shadow: 4px 4px var(--color-primary-shade);
+  }
+
+  .dash-panel { display: none; }
+  .dash-panel.is-active { display: block; }
+
+  .dash-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+    gap: var(--padding-3x);
+    margin-bottom: var(--padding-4x);
+  }
+
+  .dash-chart { padding: var(--padding-3x); }
+  .dash-chart svg { display: block; width: 100%; height: auto; }
+  .dash-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--padding-3x);
+    margin-top: var(--padding-2x);
+    font-size: var(--font-size-ultra-small);
+    color: var(--value-color);
+  }
+  .dash-legend span { display: inline-flex; align-items: center; gap: var(--padding-1x); }
+  .dash-legend i { width: 12px; height: 3px; display: inline-block; }
+
+  .dash-bars { display: flex; flex-direction: column; gap: var(--padding-1_5x); }
+  .dash-bar {
+    display: grid;
+    grid-template-columns: minmax(70px, 38%) 1fr auto;
+    align-items: center;
+    gap: var(--padding-2x);
+    font-size: var(--font-size-very-small);
+  }
+  .dash-bar .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dash-bar .track {
+    background: var(--color-body);
+    border: 1px solid rgba(var(--color-card-contrast-rgb), 0.25);
+    height: 10px;
+  }
+  .dash-bar .fill { height: 100%; background: var(--color-primary); }
+  .dash-bar .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .dash-empty {
+    text-align: center;
+    padding: var(--padding-8x);
+    color: var(--value-color);
+    font-size: var(--font-size-small);
+  }
+
+  .dash-note {
+    font-size: var(--font-size-very-small);
+    color: var(--value-color);
+    margin: 0 0 var(--padding-3x);
+  }
+
+  .dash-out {
+    background: var(--color-body);
+    border: 1px solid var(--color-card-contrast);
+    border-radius: var(--border-radius);
+    padding: var(--padding-3x);
+    overflow: auto;
+    max-height: 24rem;
+    font-size: var(--font-size-very-small);
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: var(--padding-3x) 0 0;
+  }
+
+  .dash-alert {
+    border: 1px solid var(--color-error);
+    color: var(--color-error);
+    background: rgba(var(--color-error-rgb), 0.08);
+    padding: var(--padding-2x) var(--padding-3x);
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-small);
+    margin-bottom: var(--padding-4x);
+  }
+  .dash-alert.ok {
+    border-color: var(--color-success);
+    color: var(--color-success);
+    background: rgba(var(--color-success-rgb), 0.08);
+  }
+
+  .dash-code {
+    display: block;
+    word-break: break-all;
+    font-size: var(--font-size-ultra-small);
+  }
+
+  @media (max-width: 640px) {
+    .dash-wrap { padding: var(--padding-8x) var(--padding-3x) var(--padding-8x); }
+    .dash-metrics { grid-template-columns: repeat(2, 1fr); }
+    .dash-metric .dash-value { font-size: 1.4rem; }
+  }
+</style>
 </head>
 <body>
 
 {% include 'nav.html' %}
 
-<div class="container" style="padding: var(--padding-12x) var(--padding-6x) var(--padding-12x); max-width: 1000px; margin: 0 auto;">
+<div class="dash-wrap">
 
-<div style="text-align: center; margin-bottom: var(--padding-12x);">
-  <h1 style="margin-bottom: var(--padding-4x);">Admin Dashboard</h1>
-  <p style="color: var(--value-color);">Monitor metrics and manage accounts.</p>
-</div>
-
-<div id="admin-login-form" class="card-container" style="max-width: 500px; margin: 0 auto var(--padding-12x); padding: var(--padding-8x);">
-  <h2 style="margin-bottom: var(--padding-6x); text-align: center;">Login</h2>
-  <div class="form" role="form" aria-label="Admin dashboard">
-    <label for="token">Admin token</label>
-    <input type="password" id="token" placeholder="Bearer token">
-    <label for="admin-totp">TOTP code / recovery code</label>
-    <input type="text" id="admin-totp" placeholder="000000">
-    <label class="options">
-      <input type="checkbox" id="remember-token"> Remember me for 30 days
-    </label>
-    <button id="load" type="button" style="width: 100%; margin-top: var(--padding-4x);">Load Metrics</button>
-  </div>
-</div>
-
-<div id="admin-2fa-setup" style="display:none;" class="card-container" style="max-width: 500px; margin: 0 auto; padding: var(--padding-8x);">
-  <h2 style="margin-bottom: var(--padding-4x);">Admin 2FA Setup Required</h2>
-  <p style="margin-bottom: var(--padding-4x);">Scan the QR code with your authenticator app, then enter the 6-digit code to finish setup.</p>
-  <div id="admin-2fa-qr" style="margin: var(--padding-4x) 0;"></div>
-  <label for="admin-2fa-code">Verification code</label>
-  <input type="text" id="admin-2fa-code" placeholder="000000">
-  <button id="verify-admin-2fa" type="button" style="width: 100%; margin-top: var(--padding-4x);">Verify and Enable 2FA</button>
-  <div id="admin-2fa-result" class="success" style="display:none; margin-top: var(--padding-4x);" role="status" aria-live="polite"></div>
-</div>
-
-<div id="error" class="error" style="display:none; margin-bottom: var(--padding-8x);" role="status" aria-live="polite"></div>
-
-<div class="grid" id="metrics" style="display:none; margin-bottom: var(--padding-12x); gap: var(--padding-4x);">
-  <div class="card-container" style="padding: var(--padding-6x); text-align: center;">
-    <div class="label" style="margin-bottom: var(--padding-2x);">Bot IPs (1h)</div>
-    <div class="value" id="bot_ips_1h" style="font-size: 2rem; font-weight: 800;">0</div>
-  </div>
-  <div class="card-container" style="padding: var(--padding-6x); text-align: center;">
-    <div class="label" style="margin-bottom: var(--padding-2x);">Failures (1h)</div>
-    <div class="value" id="total_failures_1h" style="font-size: 2rem; font-weight: 800;">0</div>
-  </div>
-  <div class="card-container" style="padding: var(--padding-6x); text-align: center;">
-    <div class="label" style="margin-bottom: var(--padding-2x);">Solved (1h)</div>
-    <div class="value" id="solves_1h" style="font-size: 2rem; font-weight: 800;">0</div>
-  </div>
-  <div class="card-container" style="padding: var(--padding-6x); text-align: center;">
-    <div class="label" style="margin-bottom: var(--padding-2x);">Active Sessions</div>
-    <div class="value" id="sessions_active" style="font-size: 2rem; font-weight: 800;">0</div>
-  </div>
-  <div class="card-container" style="padding: var(--padding-6x); text-align: center;">
-    <div class="label" style="margin-bottom: var(--padding-2x);">DB Size</div>
-    <div class="value" id="db_size" style="font-size: 2rem; font-weight: 800;">0</div>
-  </div>
-</div>
-
-<div id="admin-section" style="display:none;">
-  <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
-    <h2 style="margin-bottom: var(--padding-4x);">Accounts</h2>
-    <p style="color: var(--value-color); margin-bottom: var(--padding-6x);">Manage accounts and remove accounts as needed.</p>
-    <div id="accounts-list"></div>
+  <div class="dash-head">
+    <h1>Admin Dashboard</h1>
+    <p>Monitor metrics, analyze traffic and manage accounts.</p>
   </div>
 
-  <div class="card-container" style="padding: var(--padding-6x);">
-    <h2 style="margin-bottom: var(--padding-4x);">Data Subject Requests</h2>
-    <p style="color: var(--value-color); margin-bottom: var(--padding-6x);">Export or delete personal data associated with an IP address or prefix.</p>
-    <div class="form">
-      <label for="ip">Identifier (IP prefix or full IP)</label>
-      <input type="text" id="ip" placeholder="e.g. 203.0.113.0/24">
-      <div style="display: flex; gap: var(--padding-3x); margin-top: var(--padding-4x);">
-        <button id="export" type="button">Export Data</button>
-        <button id="delete" type="button" class="error">Delete Data</button>
+  <!-- ---------- Login ---------- -->
+  <div id="admin-login-form" class="card-container with-title" style="max-width: 460px; margin: 0 auto var(--padding-8x);">
+    <div class="title">Login</div>
+    <div class="content">
+      <div class="form" role="form" aria-label="Admin dashboard">
+        <label for="token">Admin token</label>
+        <input type="password" id="token" placeholder="Bearer token" autocomplete="off">
+        <label for="admin-totp">TOTP code / recovery code</label>
+        <input type="text" id="admin-totp" placeholder="000000" autocomplete="one-time-code" inputmode="numeric" maxlength="8">
+        <label class="options">
+          <input type="checkbox" id="remember-token"> Remember me for 30 days
+        </label>
+        <button id="load" type="button" style="width: 100%;">Load Dashboard</button>
       </div>
     </div>
-    <div id="data-error" class="error" style="display:none; margin-top: var(--padding-4x);" role="status" aria-live="polite"></div>
-    <pre id="data-output" style="display:none; margin-top: var(--padding-4x); background:var(--color-body); padding:var(--padding-4x); overflow-x:auto; max-height:20rem;"></pre>
   </div>
-</div>
 
+  <!-- ---------- 2FA setup ---------- -->
+  <div id="admin-2fa-setup" class="card-container with-title" style="display:none; max-width: 460px; margin: 0 auto var(--padding-8x);">
+    <div class="title">Admin 2FA Setup Required</div>
+    <div class="content">
+      <p style="font-size: var(--font-size-small);">Scan the QR code with your authenticator app, then enter the 6-digit code to finish setup.</p>
+      <div id="admin-2fa-qr" style="text-align: center; margin: var(--padding-3x) 0;"></div>
+      <label for="admin-2fa-code">Verification code</label>
+      <input type="text" id="admin-2fa-code" placeholder="000000" autocomplete="one-time-code" inputmode="numeric" maxlength="6">
+      <button id="verify-admin-2fa" type="button" style="width: 100%;">Verify and Enable 2FA</button>
+      <div id="admin-2fa-result" class="dash-alert ok" style="display:none; margin-top: var(--padding-3x);" role="status" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <div id="error" class="dash-alert" style="display:none;" role="status" aria-live="polite"></div>
+
+  <!-- ---------- Dashboard ---------- -->
+  <div id="dashboard-content" style="display:none;">
+
+    <div class="dash-toolbar">
+      <h2>Overview</h2>
+      <div class="actions" role="group" aria-label="Time range">
+        <button type="button" class="dash-tab time-btn" data-hours="1" aria-selected="true">1h</button>
+        <button type="button" class="dash-tab time-btn" data-hours="24" aria-selected="false">24h</button>
+        <button type="button" class="dash-tab time-btn" data-hours="168" aria-selected="false">7d</button>
+        <button type="button" class="dash-tab time-btn" data-hours="0" aria-selected="false">All</button>
+        <button type="button" class="dash-tab" id="refresh-all">Refresh</button>
+      </div>
+    </div>
+
+    <div class="dash-metrics">
+      <div class="dash-metric">
+        <div class="dash-label">Bot IPs</div>
+        <div class="dash-value" id="m-bot-ips">0</div>
+        <div class="sub" id="m-bot-ips-all"></div>
+      </div>
+      <div class="dash-metric is-error">
+        <div class="dash-label">Failures</div>
+        <div class="dash-value" id="m-failures">0</div>
+        <div class="sub" id="m-failures-all"></div>
+      </div>
+      <div class="dash-metric is-success">
+        <div class="dash-label">Solved</div>
+        <div class="dash-value" id="m-solves">0</div>
+        <div class="sub" id="m-solves-all"></div>
+      </div>
+      <div class="dash-metric">
+        <div class="dash-label">Active sessions</div>
+        <div class="dash-value" id="m-sessions">0</div>
+        <div class="sub">Not yet expired</div>
+      </div>
+      <div class="dash-metric">
+        <div class="dash-label">DB size</div>
+        <div class="dash-value" id="m-db-size">0 B</div>
+        <div class="sub">SQLite on disk</div>
+      </div>
+      <div class="dash-metric">
+        <div class="dash-label">Flagged IPs</div>
+        <div class="dash-value" id="m-flagged">0</div>
+        <div class="sub">In this window</div>
+      </div>
+    </div>
+
+    <div class="dash-tabs" role="tablist" aria-label="Dashboard sections">
+      <button type="button" class="dash-tab" role="tab" data-tab="analytics" aria-selected="true">Analytics</button>
+      <button type="button" class="dash-tab" role="tab" data-tab="ips" aria-selected="false">Top IPs</button>
+      <button type="button" class="dash-tab" role="tab" data-tab="accounts" aria-selected="false">Accounts</button>
+      <button type="button" class="dash-tab" role="tab" data-tab="requests" aria-selected="false">Data requests</button>
+      <button type="button" class="dash-tab" role="tab" data-tab="log" aria-selected="false">Admin log</button>
+    </div>
+
+    <!-- Analytics -->
+    <section id="panel-analytics" class="dash-panel is-active" role="tabpanel">
+      <div class="dash-toolbar">
+        <h2>Traffic analytics</h2>
+        <div class="actions">
+          <select id="an-scope" aria-label="Scope">
+            <option value="tenant">Tenant</option>
+            <option value="shield">Shield</option>
+          </select>
+          <select id="an-bucket" aria-label="Bucket">
+            <option value="auto">Auto</option>
+            <option value="hour">Hourly</option>
+            <option value="day">Daily</option>
+          </select>
+          <button type="button" class="dash-tab" id="refresh-analytics">Refresh</button>
+        </div>
+      </div>
+
+      <div class="dash-metrics">
+        <div class="dash-metric">
+          <div class="dash-label">Requests</div>
+          <div class="dash-value" id="an-requests">0</div>
+        </div>
+        <div class="dash-metric">
+          <div class="dash-label">Unique visitors</div>
+          <div class="dash-value" id="an-visitors">0</div>
+        </div>
+        <div class="dash-metric">
+          <div class="dash-label">Transferred</div>
+          <div class="dash-value" id="an-bytes">0 B</div>
+        </div>
+        <div class="dash-metric">
+          <div class="dash-label">Avg latency</div>
+          <div class="dash-value" id="an-avg">0</div>
+          <div class="sub">ms</div>
+        </div>
+        <div class="dash-metric">
+          <div class="dash-label">p95 latency</div>
+          <div class="dash-value" id="an-p95">0</div>
+          <div class="sub">ms</div>
+        </div>
+        <div class="dash-metric is-success">
+          <div class="dash-label">Cache hit</div>
+          <div class="dash-value" id="an-cache">0%</div>
+        </div>
+        <div class="dash-metric is-error">
+          <div class="dash-label">Error rate</div>
+          <div class="dash-value" id="an-errors">0%</div>
+        </div>
+        <div class="dash-metric">
+          <div class="dash-label">Success rate</div>
+          <div class="dash-value" id="an-success">0%</div>
+        </div>
+      </div>
+
+      <div class="card-container with-title">
+        <div class="title">Timeline</div>
+        <div class="content dash-chart">
+          <div id="an-timeline"></div>
+          <div class="dash-legend">
+            <span><i style="background: var(--color-primary);"></i> Requests</span>
+            <span><i style="background: var(--color-error);"></i> Errors</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="dash-grid" style="margin-top: var(--padding-4x);">
+        <div class="card-container with-title">
+          <div class="title">Endpoints</div>
+          <div class="content"><div class="dash-bars" id="an-endpoints"></div></div>
+        </div>
+        <div class="card-container with-title">
+          <div class="title">Paths</div>
+          <div class="content"><div class="dash-bars" id="an-paths"></div></div>
+        </div>
+        <div class="card-container with-title">
+          <div class="title">Status codes</div>
+          <div class="content"><div class="dash-bars" id="an-statuses"></div></div>
+        </div>
+        <div class="card-container with-title">
+          <div class="title">Outcomes</div>
+          <div class="content"><div class="dash-bars" id="an-outcomes"></div></div>
+        </div>
+        <div class="card-container with-title">
+          <div class="title">Cache status</div>
+          <div class="content"><div class="dash-bars" id="an-cache-status"></div></div>
+        </div>
+        <div class="card-container with-title">
+          <div class="title">HTTP version</div>
+          <div class="content"><div class="dash-bars" id="an-http"></div></div>
+        </div>
+        <div class="card-container with-title">
+          <div class="title">Browsers</div>
+          <div class="content"><div class="dash-bars" id="an-browsers"></div></div>
+        </div>
+        <div class="card-container with-title">
+          <div class="title">Operating systems</div>
+          <div class="content"><div class="dash-bars" id="an-os"></div></div>
+        </div>
+        <div class="card-container with-title">
+          <div class="title">Devices</div>
+          <div class="content"><div class="dash-bars" id="an-devices"></div></div>
+        </div>
+        <div class="card-container with-title">
+          <div class="title">Countries</div>
+          <div class="content"><div class="dash-bars" id="an-geo"></div></div>
+        </div>
+        <div class="card-container with-title">
+          <div class="title">Cities</div>
+          <div class="content"><div class="dash-bars" id="an-cities"></div></div>
+        </div>
+        <div class="card-container with-title">
+          <div class="title">Hosts</div>
+          <div class="content"><div class="dash-bars" id="an-hosts"></div></div>
+        </div>
+        <div class="card-container with-title">
+          <div class="title">CDN colos</div>
+          <div class="content"><div class="dash-bars" id="an-colos"></div></div>
+        </div>
+        <div class="card-container with-title">
+          <div class="title">Top visitors</div>
+          <div class="content"><div class="dash-bars" id="an-top-visitors"></div></div>
+        </div>
+        <div class="card-container with-title">
+          <div class="title">User agents</div>
+          <div class="content"><div class="dash-bars" id="an-ua"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Top IPs -->
+    <section id="panel-ips" class="dash-panel" role="tabpanel">
+      <div class="dash-toolbar">
+        <h2>Top IPs by failures</h2>
+      </div>
+      <div class="table-container" style="overflow: auto; max-height: 32rem;">
+        <table id="tbl-ips">
+          <thead>
+            <tr>
+              <th style="width: 30%;">IP</th>
+              <th style="width: 25%;">Location</th>
+              <th style="width: 20%;">Failures</th>
+              <th style="width: 25%;">Last seen</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Accounts -->
+    <section id="panel-accounts" class="dash-panel" role="tabpanel">
+      <div class="dash-toolbar">
+        <h2>Accounts</h2>
+        <div class="actions">
+          <button type="button" class="dash-tab" id="refresh-accounts">Refresh</button>
+        </div>
+      </div>
+      <div class="card-container">
+        <div class="content">
+          <p class="dash-note">Create accounts with <code>POST /admin/account</code> (admin token). Every account owns its own domains, sessions and traffic.</p>
+          <div class="table-container" style="overflow: auto; max-height: 32rem;">
+            <table id="tbl-accounts">
+              <thead>
+                <tr>
+                  <th style="width: 18%;">Account</th>
+                  <th style="width: 22%;">Primary domain</th>
+                  <th style="width: 16%;">Created</th>
+                  <th style="width: 16%;">Last seen</th>
+                  <th style="width: 18%;">Notes</th>
+                  <th style="width: 10%;">Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Data subject requests -->
+    <section id="panel-requests" class="dash-panel" role="tabpanel">
+      <div class="dash-toolbar">
+        <h2>Data subject requests</h2>
+      </div>
+      <div class="card-container">
+        <div class="content">
+          <p class="dash-note">Export or delete personal data associated with an IP address or prefix.</p>
+          <label for="ip">Identifier (IP prefix or full IP)</label>
+          <input type="text" id="ip" placeholder="e.g. 203.0.113.0/24" style="max-width: 24rem;">
+          <div style="display: flex; gap: var(--padding-2x); margin-top: var(--padding-2x);">
+            <button id="export" type="button">Export data</button>
+            <button id="delete" type="button" class="error">Delete data</button>
+          </div>
+          <div id="data-error" class="dash-alert" style="display:none; margin-top: var(--padding-3x);" role="status" aria-live="polite"></div>
+          <pre id="data-output" class="dash-out" style="display:none;"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Admin access log -->
+    <section id="panel-log" class="dash-panel" role="tabpanel">
+      <div class="dash-toolbar">
+        <h2>Admin access log</h2>
+        <div class="actions">
+          <button type="button" class="dash-tab" id="refresh-log">Refresh</button>
+        </div>
+      </div>
+      <div class="table-container" style="overflow: auto; max-height: 32rem;">
+        <table id="tbl-log">
+          <thead>
+            <tr>
+              <th style="width: 20%;">Timestamp</th>
+              <th style="width: 28%;">Endpoint</th>
+              <th style="width: 12%;">Token</th>
+              <th style="width: 20%;">IP</th>
+              <th style="width: 20%;">Location</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
 </div>
 
 {% include 'footer.html' %}
 
 <script>
-  const tokenEl = document.getElementById('token');
-  const totpEl = document.getElementById('admin-totp');
-  const rememberEl = document.getElementById('remember-token');
-  const TOKEN_STORAGE_KEY = 'menta_admin_token';
-  const TOKEN_EXPIRY_KEY = 'menta_admin_token_expires';
+(function () {
+  'use strict';
+
+  var tokenEl = document.getElementById('token');
+  var totpEl = document.getElementById('admin-totp');
+  var rememberEl = document.getElementById('remember-token');
+  var TOKEN_STORAGE_KEY = 'menta_admin_token';
+  var TOKEN_EXPIRY_KEY = 'menta_admin_token_expires';
+
+  var currentHours = 1;
+  var analyticsCache = null;
+  var admin2faSecret = '';
+
+  /* ------------------------------------------------------------------ *
+   * Helpers
+   * ------------------------------------------------------------------ */
+
+  function el(id) { return document.getElementById(id); }
+
+  function clear(node) { while (node && node.firstChild) node.removeChild(node.firstChild); }
+
+  function textNode(tag, text, className) {
+    var n = document.createElement(tag);
+    n.textContent = text;
+    if (className) n.className = className;
+    return n;
+  }
+
+  function formatNumber(n) {
+    n = Number(n) || 0;
+    if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e4) return (n / 1e3).toFixed(1) + 'K';
+    return n.toLocaleString();
+  }
+
+  function formatBytes(bytes) {
+    bytes = Number(bytes) || 0;
+    var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    var i = 0;
+    while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
+    return (i === 0 ? bytes.toFixed(0) : bytes.toFixed(1)) + ' ' + units[i];
+  }
+
+  function formatTimestamp(ts) {
+    if (!ts) return '—';
+    var d = new Date(Number(ts) * 1000);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleString();
+  }
+
+  function formatPercent(rate) {
+    return ((Number(rate) || 0) * 100).toFixed(1) + '%';
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Token storage
+   * ------------------------------------------------------------------ */
 
   function loadRememberedToken() {
     try {
-      const token = localStorage.getItem(TOKEN_STORAGE_KEY);
-      const expires = parseInt(localStorage.getItem(TOKEN_EXPIRY_KEY) || '0', 10);
+      var token = localStorage.getItem(TOKEN_STORAGE_KEY);
+      var expires = parseInt(localStorage.getItem(TOKEN_EXPIRY_KEY) || '0', 10);
       if (token && Date.now() < expires) {
         tokenEl.value = token;
         rememberEl.checked = true;
-        return true;
-      } else {
-        localStorage.removeItem(TOKEN_STORAGE_KEY);
-        localStorage.removeItem(TOKEN_EXPIRY_KEY);
-        rememberEl.checked = false;
+        return;
       }
-    } catch (e) {}
-    return false;
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      localStorage.removeItem(TOKEN_EXPIRY_KEY);
+      rememberEl.checked = false;
+    } catch (e) { /* storage unavailable */ }
   }
 
   function saveRememberedToken() {
@@ -131,191 +596,652 @@
         localStorage.removeItem(TOKEN_STORAGE_KEY);
         localStorage.removeItem(TOKEN_EXPIRY_KEY);
       }
-    } catch (e) {}
+    } catch (e) { /* storage unavailable */ }
   }
 
   function clearRememberedToken() {
     try {
       localStorage.removeItem(TOKEN_STORAGE_KEY);
       localStorage.removeItem(TOKEN_EXPIRY_KEY);
-    } catch (e) {}
+    } catch (e) { /* storage unavailable */ }
   }
 
-  function adminHeaders(contentType) {
-    const token = tokenEl.value.trim();
-    const totp = totpEl.value.trim();
-    const headers = { 'Authorization': 'Bearer ' + token };
-    if (contentType) headers['Content-Type'] = 'application/json';
+  function adminHeaders(withJson) {
+    var headers = {};
+    var tok = tokenEl.value.trim();
+    if (tok) headers['Authorization'] = 'Bearer ' + tok;
+    if (withJson) headers['Content-Type'] = 'application/json';
+    var totp = totpEl.value.trim();
     if (totp) {
       if (totp.length === 6) headers['X-Admin-TOTP'] = totp;
       else headers['X-Admin-Recovery-Code'] = totp;
     }
-    if (rememberEl.checked) {
-      headers['X-Remember-Me'] = 'true';
-    } else {
-      headers['X-Remember-Me'] = 'false';
-    }
+    headers['X-Remember-Me'] = rememberEl.checked ? 'true' : 'false';
     return headers;
   }
 
-  function handleAdminError(r, data) {
-    if (r.status === 403 && data && data.setup_required) {
+  function showError(message) {
+    var box = el('error');
+    box.textContent = message;
+    box.style.display = 'block';
+  }
+
+  function hideError() { el('error').style.display = 'none'; }
+
+  function handleAdminError(statusOrResp, data) {
+    var status = (statusOrResp && statusOrResp.status) ? statusOrResp.status : statusOrResp;
+    if (status === 403 && data && data.setup_required) {
       showAdmin2FASetup();
       throw new Error('Admin 2FA setup required');
     }
-    throw new Error(data.error || 'Error ' + r.status);
+    throw new Error((data && data.error) || ('Error ' + status));
   }
 
-  async function loadMetrics(silent = false) {
-    const errorEl = document.getElementById('error');
-    const metricsEl = document.getElementById('metrics');
-    const adminEl = document.getElementById('admin-section');
-    if (!silent) errorEl.style.display = 'none';
-    try {
-      const r = await fetch('/admin/metrics', { headers: adminHeaders() });
-      const data = await r.json();
-      if (!r.ok) handleAdminError(r, data);
-      for (const key of ['bot_ips_1h', 'total_failures_1h', 'solves_1h', 'sessions_active']) {
-        document.getElementById(key).textContent = data[key] ?? 0;
-      }
-      const bytes = data.db_size || 0;
-      document.getElementById('db_size').textContent = bytes < 1024 ? bytes + ' B' : (bytes / 1024).toFixed(1) + ' KB';
-      metricsEl.style.display = 'grid';
-      adminEl.style.display = 'block';
-      document.getElementById('admin-login-form').style.display = 'none';
-      return true;
-    } catch (e) {
-      metricsEl.style.display = 'none';
-      adminEl.style.display = 'none';
-      if (!silent) {
-        errorEl.textContent = e.message;
-        errorEl.style.display = 'block';
-      }
-      return false;
-    }
-  }
+  /* ------------------------------------------------------------------ *
+   * Metrics
+   * ------------------------------------------------------------------ */
 
-  async function loadData(action) {
-    const ip = document.getElementById('ip').value;
-    const errEl = document.getElementById('data-error');
-    const outEl = document.getElementById('data-output');
-    errEl.style.display = 'none';
-    outEl.style.display = 'none';
-    try {
-      const r = await fetch('/admin/' + action, {
-        method: 'POST',
-        headers: adminHeaders(true),
-        body: JSON.stringify({ ip })
+  function loadMetrics(silent) {
+    var dashboard = el('dashboard-content');
+    if (!silent) hideError();
+
+    return fetch('/admin/metrics?hours=' + currentHours, { headers: adminHeaders(false), credentials: 'same-origin' })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
+      .then(function (res) {
+        if (!res.ok) handleAdminError(res.status, res.data);
+        var d = res.data;
+
+        el('m-bot-ips').textContent = formatNumber(d.bot_ips);
+        el('m-failures').textContent = formatNumber(d.total_failures);
+        el('m-solves').textContent = formatNumber(d.solves);
+        el('m-sessions').textContent = formatNumber(d.sessions_active);
+        el('m-db-size').textContent = formatBytes(d.db_size);
+        el('m-flagged').textContent = formatNumber((d.top_ips || []).length);
+
+        el('m-bot-ips-all').textContent = 'All time: ' + formatNumber(d.bot_ips_all);
+        el('m-failures-all').textContent = 'All time: ' + formatNumber(d.total_failures_all);
+        el('m-solves-all').textContent = 'All time: ' + formatNumber(d.solves_all);
+
+        renderTopIPs(d.top_ips || []);
+
+        dashboard.style.display = 'block';
+        el('admin-login-form').style.display = 'none';
+        if (rememberEl.checked && tokenEl.value) saveRememberedToken();
+        return true;
+      })
+      .catch(function (e) {
+        dashboard.style.display = 'none';
+        if (!silent) showError(e.message);
+        return false;
       });
-      const data = await r.json();
-      if (!r.ok) handleAdminError(r, data);
-      outEl.textContent = JSON.stringify(data, null, 2);
-      outEl.style.display = 'block';
-    } catch (e) {
-      errEl.textContent = e.message;
-      errEl.style.display = 'block';
-    }
   }
 
-  let admin2faSecret = '';
+  function renderTopIPs(rows) {
+    var tbody = el('tbl-ips').querySelector('tbody');
+    clear(tbody);
 
-  async function showAdmin2FASetup() {
-    document.getElementById('admin-2fa-setup').style.display = 'block';
-    document.getElementById('metrics').style.display = 'none';
-    document.getElementById('admin-section').style.display = 'none';
-    try {
-      const r = await fetch('/admin/2fa/setup', { method: 'POST', headers: adminHeaders(true) });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
-      admin2faSecret = data.secret;
-      document.getElementById('admin-2fa-qr').innerHTML = '<img src="data:image/svg+xml;base64,' + data.qr + '" alt="QR" style="max-width:240px;border:1px solid var(--color-card-contrast);"><br><code>' + data.uri + '</code>';
-    } catch (e) {
-      document.getElementById('error').textContent = e.message;
-      document.getElementById('error').style.display = 'block';
+    if (!rows.length) {
+      var tr = document.createElement('tr');
+      var td = document.createElement('td');
+      td.colSpan = 4;
+      td.className = 'dash-empty';
+      td.textContent = 'No failures recorded for this period.';
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+      return;
     }
+
+    rows.forEach(function (row) {
+      var tr = document.createElement('tr');
+      var tdIp = document.createElement('td');
+      var span = document.createElement('span');
+      span.textContent = row.ip || '';
+      span.setAttribute('data-identifier', row.ip || '');
+      span.setAttribute('data-what', 'IP');
+      span.setAttribute('data-shorten', 'false');
+      tdIp.appendChild(span);
+      tr.appendChild(tdIp);
+      var loc = '';
+      if (row.country && row.country !== 'Unknown') {
+        loc = row.city && row.city !== 'Unknown' ? row.city + ', ' + row.country_code : row.country;
+      }
+      tr.appendChild(textNode('td', loc || '—'));
+      tr.appendChild(textNode('td', formatNumber(row.failures)));
+      tr.appendChild(textNode('td', formatTimestamp(row.last_seen)));
+      tbody.appendChild(tr);
+    });
+
+    if (window.MentaIdentifier) window.MentaIdentifier.initAll(tbody);
   }
 
-  async function verifyAdmin2FA() {
-    const code = document.getElementById('admin-2fa-code').value.trim();
-    const resultEl = document.getElementById('admin-2fa-result');
-    resultEl.style.display = 'none';
-    try {
-      const r = await fetch('/admin/2fa/verify', {
-        method: 'POST',
-        headers: adminHeaders(true),
-        body: JSON.stringify({ secret: admin2faSecret, code })
+  /* ------------------------------------------------------------------ *
+   * Analytics
+   * ------------------------------------------------------------------ */
+
+  function loadAnalytics() {
+    var scope = el('an-scope').value;
+    var bucket = el('an-bucket').value;
+    var url = '/admin/analytics?hours=' + currentHours + '&scope=' + encodeURIComponent(scope) + '&bucket=' + encodeURIComponent(bucket);
+
+    return fetch(url, { headers: adminHeaders(false), credentials: 'same-origin' })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
+      .then(function (res) {
+        if (!res.ok) handleAdminError(res.status, res.data);
+        analyticsCache = res.data;
+        renderAnalytics(res.data);
+      })
+      .catch(function (e) {
+        analyticsCache = null;
+        showError('Analytics: ' + e.message);
       });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
-      resultEl.innerHTML = '<strong>2FA enabled.</strong> Save these recovery codes, they will not be shown again:<br><code>' + (data.recovery_codes || []).join('</code> <code>') + '</code>';
-      resultEl.style.display = 'block';
-      document.getElementById('admin-2fa-setup').style.display = 'none';
-      if (await loadMetrics()) { loadAccounts(); }
-    } catch (e) {
-      resultEl.textContent = e.message;
-      resultEl.className = 'error';
-      resultEl.style.display = 'block';
+  }
+
+  function renderAnalytics(d) {
+    var t = d.totals || {};
+
+    el('an-requests').textContent = formatNumber(t.requests);
+    el('an-visitors').textContent = formatNumber(t.visitors);
+    el('an-bytes').textContent = formatBytes(t.bytes);
+    el('an-avg').textContent = (Number(t.avg_duration_ms) || 0).toFixed(1);
+    el('an-p95').textContent = (Number(t.p95_duration_ms) || 0).toFixed(1);
+    el('an-cache').textContent = formatPercent(t.cache_hit_rate);
+    el('an-errors').textContent = formatPercent(t.error_rate);
+    el('an-success').textContent = formatPercent(t.success_rate);
+
+    renderTimeline(d.timeline || []);
+
+    renderBars('an-endpoints', (d.endpoints || []).map(function (r) { return { label: r.label, value: r.requests }; }));
+    renderBars('an-paths', (d.paths || []).map(function (r) { return { label: r.label, value: r.requests }; }));
+    renderBars('an-statuses', (d.statuses || []).map(function (r) { return { label: String(r.status), value: r.count, color: statusColor(r.status) }; }));
+    renderBars('an-outcomes', (d.outcomes || []).map(function (r) { return { label: r.label, value: r.requests, color: outcomeColor(r.label) }; }));
+    renderBars('an-cache-status', (d.cache || []).map(function (r) { return { label: r.label, value: r.requests }; }));
+    renderBars('an-http', (d.http || []).map(function (r) { return { label: r.label, value: r.requests }; }));
+    renderBars('an-browsers', (d.browsers || []).map(function (r) { return { label: r.label, value: r.requests }; }));
+    renderBars('an-os', (d.os || []).map(function (r) { return { label: r.label, value: r.requests }; }));
+    renderBars('an-devices', (d.devices || []).map(function (r) { return { label: r.label, value: r.requests }; }));
+    renderBars('an-geo', (d.geo || []).map(function (r) { return { label: r.country + ' (' + r.country_code + ')', value: r.requests }; }));
+    renderBars('an-cities', (d.cities || []).map(function (r) { return { label: r.city + ', ' + r.country_code, value: r.requests }; }));
+    renderBars('an-hosts', (d.hosts || []).map(function (r) { return { label: r.label, value: r.requests }; }));
+    renderBars('an-colos', (d.colos || []).map(function (r) { return { label: r.label, value: r.requests }; }));
+    renderBars('an-top-visitors', (d.visitors || []).map(function (r) { return { label: r.label, value: r.requests }; }));
+    renderBars('an-ua', (d.user_agents || []).map(function (r) { return { label: r.user_agent, value: r.requests }; }));
+  }
+
+  function statusColor(status) {
+    var s = Number(status);
+    if (s >= 500) return 'var(--color-error)';
+    if (s >= 400) return 'var(--color-warning)';
+    if (s >= 300) return 'var(--color-secondary)';
+    return 'var(--color-success)';
+  }
+
+  function outcomeColor(label) {
+    switch (label) {
+      case 'success': return 'var(--color-success)';
+      case 'blocked':
+      case 'rejected':
+      case 'server_error':
+      case 'client_error': return 'var(--color-error)';
+      case 'rate_limited': return 'var(--color-warning)';
+      default: return 'var(--color-primary)';
     }
   }
 
-  async function loadAccounts() {
-    const el = document.getElementById('accounts-list');
-    el.innerHTML = '';
-    try {
-      const r = await fetch('/admin/accounts', { headers: adminHeaders() });
-      const data = await r.json();
-      if (!r.ok) handleAdminError(r, data);
-      if (!data.accounts.length) {
-        el.innerHTML = '<p style="color: var(--value-color);">No accounts yet.</p>';
-        return;
-      }
-      const table = document.createElement('table');
-      table.className = 'table-container';
-      table.style.borderCollapse = 'collapse';
-      table.style.width = '100%';
-      table.innerHTML = '<thead><tr><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Account</th><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Domain</th><th style="text-align:left;padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);background:var(--color-card-contrast);color:var(--color-card);">Actions</th></tr></thead>';
-      for (const a of data.accounts) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = '<td style="padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);"><span data-identifier="' + a.account_number + '" data-what="account"></span></td>' +
-          '<td style="padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);"><span data-identifier="' + a.primary_domain + '" data-what="domain"></span></td>' +
-          '<td style="padding:var(--padding-3x) var(--padding-4x);border:1px solid var(--color-card-contrast);"><button class="delete-account" data-acc="' + a.account_number + '">Delete</button></td>';
-        table.appendChild(tr);
-      }
-      el.appendChild(table);
-      for (const btn of el.querySelectorAll('.delete-account')) {
-        btn.addEventListener('click', (e) => deleteAccount(e.target.dataset.acc));
-      }
-      if (window.MentaIdentifier) window.MentaIdentifier.initAll(el);
-    } catch (e) {
-      el.textContent = 'Unable to load accounts: ' + e.message;
+  function renderBars(containerId, items) {
+    var box = el(containerId);
+    if (!box) return;
+    clear(box);
+
+    if (!items.length) {
+      box.appendChild(textNode('div', 'No data for this period.', 'dash-empty'));
+      return;
     }
+
+    var max = items.reduce(function (acc, i) { return Math.max(acc, Number(i.value) || 0); }, 0) || 1;
+
+    items.slice(0, 12).forEach(function (item) {
+      var row = document.createElement('div');
+      row.className = 'dash-bar';
+
+      var name = textNode('div', item.label || '—', 'name');
+      name.title = item.label || '';
+      row.appendChild(name);
+
+      var track = document.createElement('div');
+      track.className = 'track';
+      var fill = document.createElement('div');
+      fill.className = 'fill';
+      fill.style.width = Math.max(2, ((Number(item.value) || 0) / max) * 100) + '%';
+      if (item.color) fill.style.background = item.color;
+      track.appendChild(fill);
+      row.appendChild(track);
+
+      row.appendChild(textNode('div', formatNumber(item.value), 'num'));
+      box.appendChild(row);
+    });
   }
 
+  function renderTimeline(timeline) {
+    var box = el('an-timeline');
+    if (!box) return;
+    clear(box);
 
+    if (!timeline.length) {
+      box.appendChild(textNode('div', 'No traffic recorded for this period.', 'dash-empty'));
+      return;
+    }
 
-  async function deleteAccount(accountNumber) {
+    var W = 640, H = 220, padL = 44, padR = 10, padT = 12, padB = 26;
+    var innerW = W - padL - padR;
+    var innerH = H - padT - padB;
+
+    var maxReq = timeline.reduce(function (a, b) { return Math.max(a, b.requests || 0); }, 0) || 1;
+    var maxErr = timeline.reduce(function (a, b) { return Math.max(a, b.errors || 0); }, 0) || 0;
+    var max = Math.max(maxReq, maxErr) || 1;
+
+    var svgNS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', 'Requests and errors over time');
+
+    function x(i) { return timeline.length === 1 ? padL + innerW / 2 : padL + (i / (timeline.length - 1)) * innerW; }
+    function yReq(v) { return padT + innerH - ((Number(v) || 0) / max) * innerH; }
+    function yErr(v) { return padT + innerH - ((Number(v) || 0) / max) * innerH; }
+
+    // horizontal grid + y labels
+    for (var g = 0; g <= 4; g++) {
+      var gy = padT + (innerH / 4) * g;
+      var line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('x1', padL); line.setAttribute('x2', W - padR);
+      line.setAttribute('y1', gy); line.setAttribute('y2', gy);
+      line.setAttribute('stroke', 'currentColor');
+      line.setAttribute('stroke-opacity', '0.15');
+      line.setAttribute('stroke-width', '1');
+      svg.appendChild(line);
+
+      var lbl = document.createElementNS(svgNS, 'text');
+      lbl.setAttribute('x', padL - 6);
+      lbl.setAttribute('y', gy + 3);
+      lbl.setAttribute('text-anchor', 'end');
+      lbl.setAttribute('font-size', '9');
+      lbl.setAttribute('fill', 'currentColor');
+      lbl.setAttribute('fill-opacity', '0.6');
+      lbl.textContent = formatNumber(Math.round(max - (max / 4) * g));
+      svg.appendChild(lbl);
+    }
+
+    // x labels (first, middle, last)
+    var idxs = timeline.length > 2 ? [0, Math.floor((timeline.length - 1) / 2), timeline.length - 1] : timeline.map(function (_, i) { return i; });
+    idxs.forEach(function (i) {
+      var xl = document.createElementNS(svgNS, 'text');
+      xl.setAttribute('x', x(i));
+      xl.setAttribute('y', H - 8);
+      xl.setAttribute('text-anchor', i === 0 ? 'start' : (i === timeline.length - 1 ? 'end' : 'middle'));
+      xl.setAttribute('font-size', '9');
+      xl.setAttribute('fill', 'currentColor');
+      xl.setAttribute('fill-opacity', '0.6');
+      xl.textContent = timeline[i].label || '';
+      svg.appendChild(xl);
+    });
+
+    // requests area + line
+    var reqPts = timeline.map(function (p, i) { return x(i) + ',' + yReq(p.requests); });
+    var area = document.createElementNS(svgNS, 'polygon');
+    area.setAttribute('points', padL + ',' + (padT + innerH) + ' ' + reqPts.join(' ') + ' ' + x(timeline.length - 1) + ',' + (padT + innerH));
+    area.setAttribute('fill', 'var(--color-primary)');
+    area.setAttribute('fill-opacity', '0.12');
+    svg.appendChild(area);
+
+    var reqLine = document.createElementNS(svgNS, 'polyline');
+    reqLine.setAttribute('points', reqPts.join(' '));
+    reqLine.setAttribute('fill', 'none');
+    reqLine.setAttribute('stroke', 'var(--color-primary)');
+    reqLine.setAttribute('stroke-width', '2');
+    svg.appendChild(reqLine);
+
+    // errors line
+    var errPts = timeline.map(function (p, i) { return x(i) + ',' + yErr(p.errors); });
+    var errLine = document.createElementNS(svgNS, 'polyline');
+    errLine.setAttribute('points', errPts.join(' '));
+    errLine.setAttribute('fill', 'none');
+    errLine.setAttribute('stroke', 'var(--color-error)');
+    errLine.setAttribute('stroke-width', '2');
+    svg.appendChild(errLine);
+
+    box.appendChild(svg);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Accounts
+   * ------------------------------------------------------------------ */
+
+  function loadAccounts() {
+    var tbody = el('tbl-accounts').querySelector('tbody');
+    clear(tbody);
+    tbody.appendChild(rowMessage(6, 'Loading…'));
+
+    return fetch('/admin/accounts', { headers: adminHeaders(false), credentials: 'same-origin' })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
+      .then(function (res) {
+        if (!res.ok) handleAdminError(res.status, res.data);
+        clear(tbody);
+        var accounts = res.data.accounts || [];
+
+        if (!accounts.length) {
+          tbody.appendChild(rowMessage(6, 'No accounts yet. Create one with POST /admin/account.'));
+          return;
+        }
+
+        accounts.forEach(function (a) {
+          var tr = document.createElement('tr');
+
+          var tdAcc = document.createElement('td');
+          var accSpan = document.createElement('span');
+          accSpan.textContent = a.account_number || '';
+          accSpan.setAttribute('data-identifier', a.account_number || '');
+          accSpan.setAttribute('data-what', 'account');
+          tdAcc.appendChild(accSpan);
+          tr.appendChild(tdAcc);
+
+          var tdDom = document.createElement('td');
+          var domSpan = document.createElement('span');
+          domSpan.textContent = a.primary_domain || '';
+          domSpan.setAttribute('data-identifier', a.primary_domain || '');
+          domSpan.setAttribute('data-what', 'domain');
+          domSpan.setAttribute('data-shorten', 'false');
+          tdDom.appendChild(domSpan);
+          tr.appendChild(tdDom);
+
+          tr.appendChild(textNode('td', formatTimestamp(a.created_at)));
+          tr.appendChild(textNode('td', formatTimestamp(a.last_seen_at)));
+          tr.appendChild(textNode('td', a.notes || '—'));
+
+          var tdAct = document.createElement('td');
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'error';
+          btn.textContent = 'Delete';
+          btn.style.padding = 'var(--padding-0_5x) var(--padding-2x)';
+          btn.addEventListener('click', function () { deleteAccount(a.account_number); });
+          tdAct.appendChild(btn);
+          tr.appendChild(tdAct);
+
+          tbody.appendChild(tr);
+        });
+
+        if (window.MentaIdentifier) window.MentaIdentifier.initAll(tbody);
+      })
+      .catch(function (e) {
+        clear(tbody);
+        tbody.appendChild(rowMessage(6, 'Unable to load accounts: ' + e.message));
+      });
+  }
+
+  function rowMessage(cols, message) {
+    var tr = document.createElement('tr');
+    var td = document.createElement('td');
+    td.colSpan = cols;
+    td.className = 'dash-empty';
+    td.textContent = message;
+    tr.appendChild(td);
+    return tr;
+  }
+
+  function deleteAccount(accountNumber) {
     if (!accountNumber) return;
-    if (!confirm('Delete account ' + accountNumber + ' and all its data? This cannot be undone.')) return;
-    try {
-      const r = await fetch('/admin/account/' + encodeURIComponent(accountNumber) + '/delete', {
-        method: 'POST',
-        headers: adminHeaders()
-      });
-      const data = await r.json();
-      if (!r.ok) handleAdminError(r, data);
-      alert('Account deleted: ' + accountNumber);
-      loadAccounts();
-    } catch (e) {
-      alert(e.message);
-    }
+    if (!window.confirm('Delete account ' + accountNumber + ' and all its data? This cannot be undone.')) return;
+
+    fetch('/admin/account/' + encodeURIComponent(accountNumber) + '/delete', {
+      method: 'POST', headers: adminHeaders(false), credentials: 'same-origin'
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
+      .then(function (res) {
+        if (!res.ok) handleAdminError(res.status, res.data);
+        window.alert('Account deleted: ' + accountNumber);
+        loadAccounts();
+      })
+      .catch(function (e) { window.alert(e.message); });
   }
 
-  document.getElementById('token').addEventListener('keydown', async (e) => { if (e.key === 'Enter') { saveRememberedToken(); if (await loadMetrics()) { loadAccounts(); } } });
-  document.getElementById('load').addEventListener('click', async () => { saveRememberedToken(); if (await loadMetrics()) { loadAccounts(); } });
-  document.getElementById('verify-admin-2fa').addEventListener('click', verifyAdmin2FA);
-  document.getElementById('remember-token').addEventListener('change', () => { if (!rememberEl.checked) clearRememberedToken(); });
+  /* ------------------------------------------------------------------ *
+   * Data subject requests
+   * ------------------------------------------------------------------ */
+
+  function loadData(action) {
+    var ip = el('ip').value.trim();
+    var errBox = el('data-error');
+    var out = el('data-output');
+    errBox.style.display = 'none';
+    out.style.display = 'none';
+
+    if (!ip) {
+      errBox.textContent = 'An IP address or prefix is required.';
+      errBox.style.display = 'block';
+      return;
+    }
+
+    fetch('/admin/' + action, {
+      method: 'POST',
+      headers: adminHeaders(true),
+      body: JSON.stringify({ ip: ip }),
+      credentials: 'same-origin'
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
+      .then(function (res) {
+        if (!res.ok) handleAdminError(res.status, res.data);
+        out.textContent = JSON.stringify(res.data, null, 2);
+        out.style.display = 'block';
+      })
+      .catch(function (e) {
+        errBox.textContent = e.message;
+        errBox.style.display = 'block';
+      });
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Admin access log
+   * ------------------------------------------------------------------ */
+
+  function loadAdminLog() {
+    var tbody = el('tbl-log').querySelector('tbody');
+    clear(tbody);
+    tbody.appendChild(rowMessage(5, 'Loading…'));
+
+    return fetch('/admin/access-log?limit=200', { headers: adminHeaders(false), credentials: 'same-origin' })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
+      .then(function (res) {
+        if (!res.ok) handleAdminError(res.status, res.data);
+        clear(tbody);
+        var log = res.data.log || [];
+
+        if (!log.length) {
+          tbody.appendChild(rowMessage(5, 'No admin access recorded yet.'));
+          return;
+        }
+
+        log.forEach(function (row) {
+          var tr = document.createElement('tr');
+          tr.appendChild(textNode('td', formatTimestamp(row.timestamp)));
+          tr.appendChild(textNode('td', row.endpoint || '—'));
+          tr.appendChild(textNode('td', row.token_type || '—'));
+          tr.appendChild(textNode('td', row.ip || '—'));
+          var loc = '';
+          if (row.country && row.country !== 'Unknown') {
+            loc = row.city && row.city !== 'Unknown' ? row.city + ', ' + row.country_code : row.country;
+          }
+          tr.appendChild(textNode('td', loc || '—'));
+          tbody.appendChild(tr);
+        });
+      })
+      .catch(function (e) {
+        clear(tbody);
+        tbody.appendChild(rowMessage(5, 'Unable to load admin log: ' + e.message));
+      });
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 2FA setup
+   * ------------------------------------------------------------------ */
+
+  function showAdmin2FASetup() {
+    el('admin-2fa-setup').style.display = 'block';
+    el('dashboard-content').style.display = 'none';
+    el('admin-login-form').style.display = 'none';
+
+    fetch('/admin/2fa/setup', { method: 'POST', headers: adminHeaders(true), credentials: 'same-origin' })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
+      .then(function (res) {
+        if (!res.ok) throw new Error(res.data.error || ('Error ' + res.status));
+        admin2faSecret = res.data.secret;
+        var box = el('admin-2fa-qr');
+        clear(box);
+        var img = document.createElement('img');
+        img.src = 'data:image/svg+xml;base64,' + res.data.qr;
+        img.alt = '2FA QR code';
+        img.style.maxWidth = '220px';
+        box.appendChild(img);
+        var code = document.createElement('code');
+        code.className = 'dash-code';
+        code.style.marginTop = 'var(--padding-2x)';
+        code.textContent = res.data.uri;
+        box.appendChild(code);
+      })
+      .catch(function (e) { showError(e.message); });
+  }
+
+  function verifyAdmin2FA() {
+    var code = el('admin-2fa-code').value.trim();
+    var result = el('admin-2fa-result');
+    result.style.display = 'none';
+
+    fetch('/admin/2fa/verify', {
+      method: 'POST',
+      headers: adminHeaders(true),
+      body: JSON.stringify({ secret: admin2faSecret, code: code }),
+      credentials: 'same-origin'
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
+      .then(function (res) {
+        if (!res.ok) throw new Error(res.data.error || ('Error ' + res.status));
+        clear(result);
+        result.className = 'dash-alert ok';
+        result.style.display = 'block';
+        result.appendChild(textNode('strong', '2FA enabled. '));
+        result.appendChild(document.createTextNode('Save these recovery codes, they will not be shown again: '));
+        (res.data.recovery_codes || []).forEach(function (c, i) {
+          if (i) result.appendChild(document.createTextNode(' '));
+          result.appendChild(textNode('code', c));
+        });
+        el('admin-2fa-setup').style.display = 'none';
+        if (rememberEl.checked && tokenEl.value) saveRememberedToken();
+        loadMetrics(true).then(function (ok) { if (ok) { loadAccounts(); loadAnalytics(); } });
+      })
+      .catch(function (e) {
+        result.className = 'dash-alert';
+        result.textContent = e.message;
+        result.style.display = 'block';
+      });
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Tabs / time range
+   * ------------------------------------------------------------------ */
+
+  function selectTab(name) {
+    var tabs = document.querySelectorAll('[data-tab]');
+    for (var i = 0; i < tabs.length; i++) {
+      var isActive = tabs[i].getAttribute('data-tab') === name;
+      tabs[i].setAttribute('aria-selected', isActive ? 'true' : 'false');
+    }
+    var panels = document.querySelectorAll('.dash-panel');
+    for (var j = 0; j < panels.length; j++) {
+      panels[j].classList.toggle('is-active', panels[j].id === 'panel-' + name);
+    }
+
+    if (name === 'accounts') loadAccounts();
+    if (name === 'log') loadAdminLog();
+    if (name === 'analytics') loadAnalytics();
+  }
+
+  function setHours(hours) {
+    currentHours = hours;
+    var btns = document.querySelectorAll('.time-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].setAttribute('aria-selected', Number(btns[i].getAttribute('data-hours')) === hours ? 'true' : 'false');
+    }
+    loadMetrics(true);
+    loadAnalytics();
+  }
+
+  function refreshAll() {
+    hideError();
+    loadMetrics(true).then(function (ok) {
+      if (!ok) return;
+      loadAccounts();
+      loadAnalytics();
+      loadAdminLog();
+    });
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Wiring
+   * ------------------------------------------------------------------ */
+
+  function bind() {
+    var tabs = document.querySelectorAll('[data-tab]');
+    for (var i = 0; i < tabs.length; i++) {
+      (function (btn) {
+        btn.addEventListener('click', function () { selectTab(btn.getAttribute('data-tab')); });
+      })(tabs[i]);
+    }
+
+    var timeBtns = document.querySelectorAll('.time-btn');
+    for (var j = 0; j < timeBtns.length; j++) {
+      (function (btn) {
+        btn.addEventListener('click', function () { setHours(Number(btn.getAttribute('data-hours'))); });
+      })(timeBtns[j]);
+    }
+
+    el('load').addEventListener('click', function () {
+      hideError();
+      if (rememberEl.checked && tokenEl.value) saveRememberedToken();
+      loadMetrics(false).then(function (ok) { if (ok) { loadAccounts(); loadAnalytics(); } });
+    });
+
+    el('token').addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      hideError();
+      if (rememberEl.checked && tokenEl.value) saveRememberedToken();
+      loadMetrics(false).then(function (ok) { if (ok) { loadAccounts(); loadAnalytics(); } });
+    });
+
+    el('admin-totp').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') el('load').click();
+    });
+
+    el('verify-admin-2fa').addEventListener('click', verifyAdmin2FA);
+    el('remember-token').addEventListener('change', function () {
+      if (!rememberEl.checked) {
+        clearRememberedToken();
+      } else if (tokenEl.value) {
+        saveRememberedToken();
+      }
+    });
+    el('refresh-all').addEventListener('click', refreshAll);
+    el('refresh-analytics').addEventListener('click', function () { loadAnalytics(); });
+    el('refresh-accounts').addEventListener('click', loadAccounts);
+    el('refresh-log').addEventListener('click', loadAdminLog);
+    el('an-scope').addEventListener('change', function () { loadAnalytics(); });
+    el('an-bucket').addEventListener('change', function () { loadAnalytics(); });
+    el('export').addEventListener('click', function () { loadData('export-data'); });
+    el('delete').addEventListener('click', function () { loadData('delete-data'); });
+  }
+
   loadRememberedToken();
-  loadMetrics(true).then(success => { if (success) { loadAccounts(); } });
+  bind();
+  loadMetrics(true).then(function (ok) { if (ok) { loadAccounts(); loadAnalytics(); } });
+})();
 </script>
 
 </body>
