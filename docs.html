@@ -64,6 +64,57 @@ LOG_IP_FULL=false</code></pre>
 </div>
 
 <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">How Menta Works (flow)</h2>
+  <ol style="padding-left: var(--padding-6x); margin-bottom: var(--padding-4x);">
+    <li style="margin-bottom: var(--padding-2x);"><strong>Init</strong> — POST /init with Origin. Server validates browser signals, rate limits and bot_shield; creates signed session tied to IP prefix.</li>
+    <li style="margin-bottom: var(--padding-2x);"><strong>Challenge</strong> — POST /challenge with session_id + signature. Server validates session (exists, not expired, IP match, HMAC, min solve time), then issues salt + adaptive difficulty.</li>
+    <li style="margin-bottom: var(--padding-2x);"><strong>Solve</strong> — client brute-forces a nonce such that SHA-256(salt + nonce) starts with N zero hex chars (typically 1-3s).</li>
+    <li style="margin-bottom: var(--padding-2x);"><strong>Redeem</strong> — POST solution to /redeem. Server verifies PoW, nonce entropy, client pattern, issues single-use JWT (jti).</li>
+    <li style="margin-bottom: var(--padding-2x);"><strong>Verify</strong> — backend POSTs token to /verify; server validates signature/expiry, consumes jti, returns valid/invalid.</li>
+  </ol>
+  <p style="color: var(--value-color);">No cookies, no localStorage, no third-party telemetry. State lives in memory only.</p>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Blocking mechanisms</h2>
+  <ul style="padding-left: var(--padding-6x); margin-bottom: var(--padding-4x);">
+    <li style="margin-bottom: var(--padding-2x);"><strong>bot_shield</strong> — classifies UA (known bots, generic scripts), verifies bot IP via IP ranges / reverse-DNS, checks robots.txt, JA3/JA4 TLS fingerprint mismatch. Actions: allow / block (403) / shield (max-difficulty PoW).</li>
+    <li style="margin-bottom: var(--padding-2x);"><strong>Rate limits</strong> — per IP, per tenant, global, for /init, /challenge, /redeem, /verify, /shield/*.</li>
+    <li style="margin-bottom: var(--padding-2x);"><strong>Browser signals</strong> — validates Origin and basic browser characteristics (no fingerprinting).</li>
+    <li style="margin-bottom: var(--padding-2x);"><strong>Session validity</strong> — existence, expiry, IP prefix match, HMAC signature, min solve time (0.5s init, 1s redeem).</li>
+    <li style="margin-bottom: var(--padding-2x);"><strong>Nonce entropy</strong> — rejects precomputed/reused nonces.</li>
+    <li style="margin-bottom: var(--padding-2x);"><strong>Client pattern</strong> — solve time analyzed against human range.</li>
+    <li style="margin-bottom: var(--padding-2x);"><strong>Token single-use</strong> — consumed on /verify via jti (DB unique constraint).</li>
+  </ul>
+  <p style="color: var(--value-color);">Shield mode (/shield/check, /shield/redeem, /shield/verify) applies the same logic without widget or domain registration.</p>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Adaptive difficulty algorithm</h2>
+  <pre style="background: var(--color-body); padding: var(--padding-4x); border-radius: var(--border-radius); overflow-x: auto; margin-bottom: var(--padding-4x);"><code>target = base_difficulty(ip_reputation)
+if new_ip:            target += 1        # higher until reputation established
+if fast_solve:        target += 1        # possible bot
+if many_failures:     target += 2        # significant increase
+if consistent_pattern: target += 1        # possible automation
+if shielded:          target = max(target, MAX_DIFFICULTY)
+# PoW: find nonce where SHA-256(salt + nonce).startswith(target zeros)</code></pre>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Data processing & privacy</h2>
+  <ul style="padding-left: var(--padding-6x); margin-bottom: var(--padding-4x);">
+    <li style="margin-bottom: var(--padding-2x);"><strong>IP anonymization</strong> — only /24 (IPv4) or /64 (IPv6) prefix used by default; full IP only if LOG_IP_FULL=true.</li>
+    <li style="margin-bottom: var(--padding-2x);"><strong>Analytics pseudonym</strong> — raw IP never persisted; HMAC-SHA256 truncated (32 hex) with ANALYTICS_IP_SALT (falls back to SECRET_KEY). Visitors shown as anon-&lt;hash&gt;.</li>
+    <li style="margin-bottom: var(--padding-2x);"><strong>GeoIP</strong> — optional MaxMind GeoLite2 City, resolved in memory; only country/region/city stored. Without it, reports Unknown.</li>
+    <li style="margin-bottom: var(--padding-2x);"><strong>Referrers</strong> — reduced to host/origin, dropping query strings.</li>
+    <li style="margin-bottom: var(--padding-2x);"><strong>Retention</strong> — expired challenges/sessions/tokens cleaned via DATA_RETENTION_HOURS (default 24h); analytics via ANALYTICS_RETENTION_HOURS.</li>
+    <li style="margin-bottom: var(--padding-2x);"><strong>Encryption</strong> — SQLCipher at rest (DB_ENCRYPTION_KEY) + TLS in transit.</li>
+    <li style="margin-bottom: var(--padding-2x);"><strong>Rights</strong> — /admin/export-data and /admin/delete-data for data subject requests.</li>
+  </ul>
+  <p style="color: var(--value-color);">Analytics views at /admin/analytics require authenticated admin session with 2FA; results scoped to tenant.</p>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
   <h2 style="margin-bottom: var(--padding-4x);">Quick Start</h2>
   <p style="margin-bottom: var(--padding-4x);">Add Menta to your page in two lines:</p>
   <pre style="background: var(--color-body); padding: var(--padding-4x); border-radius: var(--border-radius); overflow-x: auto; margin-bottom: var(--padding-4x);"><code>&lt;script src="https://your-domain.com/menta-captcha.js"&gt;&lt;/script&gt;
@@ -200,6 +251,31 @@ Response:
   "valid": true,
   "tenant_id": "your-tenant"
 }</code></pre>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Menta Shield (drop-in page protection)</h2>
+  <p style="margin-bottom: var(--padding-4x);">Protect any page without a widget or domain registration:</p>
+  <pre style="background: var(--color-body); padding: var(--padding-4x); border-radius: var(--border-radius); overflow-x: auto; margin-bottom: var(--padding-4x);"><code>&lt;script src="https://your-domain.com/menta-challenge.js" data-menta-api="https://your-domain.com" data-menta-next="/protected"&gt;&lt;/script&gt;</code></pre>
+  <ul style="padding-left: var(--padding-6x); margin-bottom: var(--padding-4x);">
+    <li style="margin-bottom: var(--padding-2x);"><code>data-menta-api</code> — Menta instance URL (defaults to current origin)</li>
+    <li style="margin-bottom: var(--padding-2x);"><code>data-menta-next</code> — redirect target after success (defaults to current path)</li>
+    <li style="margin-bottom: var(--padding-2x);"><code>data-menta-i18n-checking</code> — custom checking message</li>
+  </ul>
+  <p style="color: var(--value-color);">Or link directly to the interstitial page: <code style="display: inline; padding: 2px 8px;">/challenge-page?next=/protected</code></p>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Admin Dashboard</h2>
+  <p style="margin-bottom: var(--padding-4x);">Open <code style="display: inline; padding: 2px 8px;">/dashboard</code> and authenticate with <code>ADMIN_TOKEN</code> (and TOTP if configured). Features:</p>
+  <ul style="padding-left: var(--padding-6x); margin-bottom: var(--padding-4x);">
+    <li style="margin-bottom: var(--padding-2x);">Metrics by time range (1h / 24h / 7d / all) and all-time totals</li>
+    <li style="margin-bottom: var(--padding-2x);">Top offending IPs for blocking</li>
+    <li style="margin-bottom: var(--padding-2x);">Create/delete accounts and domains</li>
+    <li style="margin-bottom: var(--padding-2x);">Data subject requests: export or delete data by IP/prefix</li>
+    <li style="margin-bottom: var(--padding-2x);">Admin 2FA setup and recovery codes</li>
+  </ul>
+  <p style="color: var(--value-color);">Admin session can be remembered for 30 days via localStorage (Menta's own dashboard only).</p>
 </div>
 
 <div style="text-align: center; margin-top: var(--padding-12x);">
