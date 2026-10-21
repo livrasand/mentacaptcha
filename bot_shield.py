@@ -219,7 +219,46 @@ def get_policy():
 
 
 
-def evaluate_request(user_agent, ip, path):
+# Fingerprints TLS (JA3/JA4) legítimos por familia de navegador. El proxy
+# inverso debe inyectarlos en X-JA3-Fingerprint / X-JA4-Fingerprint.
+KNOWN_TLS_FINGERPRINTS = {
+    "chrome": {
+        "771,4865-4866-4867-49195-49199-49196-49200-52393-49171-49172-156-157-47-53,0-23-65281-10-11-35-16-5-13-18-51-45-43-27-17513,29-23-24,0",
+    },
+    "firefox": {
+        "771,4865-4867-4866-49195-49199-52393-49196-49200-49162-49161-49171-49172-156-157-47-53,0-23-65281-10-11-35-16-5-34-51-43-13-45-28-21,29-23-24-25-256-257,0",
+    },
+    "safari": {
+        "771,4865-4866-4867-49196-49195-52393-49188-49187-49162-49161-49172-49171-157-156-53-47-49160-49170-10,0-23-65281-10-11-35-16-5-13-45-28-21-43-44,29-23-24-25,0",
+    },
+}
+
+
+def _browser_family_from_ua(user_agent):
+    ua = (user_agent or "").lower()
+    if "firefox" in ua:
+        return "firefox"
+    if "chrome" in ua and "edg" not in ua:
+        return "chrome"
+    if "safari" in ua and "chrome" not in ua:
+        return "safari"
+    return None
+
+
+def tls_fingerprint_mismatch(user_agent, tls_fingerprint):
+    """True si el UA declara un navegador cuyo fingerprint TLS no coincide."""
+    if not tls_fingerprint:
+        return False
+    family = _browser_family_from_ua(user_agent)
+    if not family:
+        return False
+    allowed = KNOWN_TLS_FINGERPRINTS.get(family)
+    if not allowed:
+        return False
+    return tls_fingerprint.strip() not in allowed
+
+
+def evaluate_request(user_agent, ip, path, tls_fingerprint=None):
     bot = classify_ua(user_agent)
     policy = get_policy()
 
@@ -237,6 +276,10 @@ def evaluate_request(user_agent, ip, path):
         else:
             return {"action": "shield", "reason": "impersonator_or_unverifiable", "bot": bot["name"],
                     "verified": verified, "difficulty_hint": "max"}
+
+    if tls_fingerprint_mismatch(user_agent, tls_fingerprint):
+        return {"action": "shield", "reason": "tls_fingerprint_mismatch", "bot": None,
+                "verified": None, "difficulty_hint": "max"}
 
     if looks_like_generic_script(user_agent):
         return {"action": "shield", "reason": "generic_script_ua", "bot": None,

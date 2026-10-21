@@ -19,55 +19,68 @@
 <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
   <h2 style="margin-bottom: var(--padding-4x);">Overview</h2>
   <p style="margin-bottom: var(--padding-4x);">Menta uses a hashcash-style proof-of-work challenge to tell humans and bots apart. Instead of asking users to identify images, it requires their browser to solve a computational puzzle.</p>
-  <p style="color: var(--value-color);">The puzzle is designed to be trivial for a human clicking once, but expensive for automated scripts trying to solve thousands of challenges.</p>
+  <p style="color: var(--value-color);">The puzzle is designed to be trivial for a human clicking once, but expensive for automated scripts trying to solve thousands of challenges. No cookies, no localStorage, no third-party telemetry.</p>
 </div>
 
 <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
-  <h2 style="margin-bottom: var(--padding-6x);">The Process</h2>
-  
+  <h2 style="margin-bottom: var(--padding-6x);">Widget mode: captcha flow</h2>
+
   <div style="margin-bottom: var(--padding-8x);">
     <h3 style="margin-bottom: var(--padding-3x);">1. Initialize Session</h3>
-    <p style="margin-bottom: var(--padding-2x);">Client requests a session from <code style="display: inline; padding: 2px 8px;">/init</code></p>
-    <p style="color: var(--value-color);">Server validates rate limits, checks bot signals, and creates a signed session tied to the client's IP.</p>
+    <p style="margin-bottom: var(--padding-2x);">Client POSTs to <code style="display: inline; padding: 2px 8px;">/init</code> with Origin header.</p>
+    <p style="color: var(--value-color);">Server validates browser signals, rate limits (per IP, tenant, global) and bot_shield signals, then creates a signed session tied to the client's IP prefix.</p>
   </div>
-  
+
   <div style="margin-bottom: var(--padding-8x);">
     <h3 style="margin-bottom: var(--padding-3x);">2. Get Challenge</h3>
-    <p style="margin-bottom: var(--padding-2x);">Client requests a challenge from <code style="display: inline; padding: 2px 8px;">/challenge</code></p>
-    <p style="color: var(--value-color);">Server generates a random salt and target difficulty based on the client's reputation.</p>
+    <p style="margin-bottom: var(--padding-2x);">Client POSTs to <code style="display: inline; padding: 2px 8px;">/challenge</code> with session_id and session_signature.</p>
+    <p style="color: var(--value-color);">Server validates the session (existence, expiry, IP match, HMAC signature, minimum solve time), then generates a random salt and target difficulty based on the client's reputation.</p>
   </div>
-  
+
   <div style="margin-bottom: var(--padding-8x);">
     <h3 style="margin-bottom: var(--padding-3x);">3. Solve Challenge</h3>
-    <p style="margin-bottom: var(--padding-2x);">Client finds a nonce where <code style="display: inline; padding: 2px 8px;">SHA-256(salt + nonce)</code> starts with N zeros</p>
+    <p style="margin-bottom: var(--padding-2x);">Client finds a nonce where <code style="display: inline; padding: 2px 8px;">SHA-256(salt + nonce)</code> starts with N zeros.</p>
     <p style="color: var(--value-color);">This requires brute-force computation, typically taking 1-3 seconds on a modern browser.</p>
   </div>
-  
+
   <div style="margin-bottom: var(--padding-8x);">
     <h3 style="margin-bottom: var(--padding-3x);">4. Redeem Token</h3>
-    <p style="margin-bottom: var(--padding-2x);">Client submits the solution to <code style="display: inline; padding: 2px 8px;">/redeem</code></p>
-    <p style="color: var(--value-color);">Server verifies the proof, validates the session, and issues a signed clearance token.</p>
+    <p style="margin-bottom: var(--padding-2x);">Client POSTs the solution to <code style="display: inline; padding: 2px 8px;">/redeem</code>.</p>
+    <p style="color: var(--value-color);">Server verifies the proof, validates session and challenge signatures, and issues a single-use signed clearance token (JWT).</p>
   </div>
-  
+
   <div>
     <h3 style="margin-bottom: var(--padding-3x);">5. Verify Token</h3>
-    <p style="margin-bottom: var(--padding-2x);">Client includes the token in form submissions</p>
-    <p style="color: var(--value-color);">Your backend verifies the token signature and expiration via <code style="display: inline; padding: 2px 8px;">/verify</code>.</p>
+    <p style="margin-bottom: var(--padding-2x);">Client includes the token in form submissions; your backend POSTs it to <code style="display: inline; padding: 2px 8px;">/verify</code>.</p>
+    <p style="color: var(--value-color);">Server validates the signature and expiration, consumes the token (single-use via jti), and returns valid/invalid.</p>
   </div>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-6x);">Shield mode: universal protection</h2>
+  <p style="margin-bottom: var(--padding-4x);">Menta Shield (menta-shield.js) protects any page without a widget or domain registration. It runs bot_shield evaluation and, when needed, an invisible proof-of-work.</p>
+  <ul style="padding-left: var(--padding-6x);">
+    <li style="margin-bottom: var(--padding-3x);"><strong>/shield/check</strong> — evaluates the request (rate limit, bot signals, JA3/JA4). Returns allow, block (403), or shield (PoW challenge at max difficulty).</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>/shield/redeem</strong> — verifies the PoW solution and issues a reusable clearance token (JWT, TTL configurable).</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>/shield/verify</strong> — server-to-server validation of a clearance token without consuming it; optional IP binding.</li>
+  </ul>
+  <p style="color: var(--value-color);">The interstitial page (/challenge-page, /verify GET) forces a manual PoW and redirects to the original destination.</p>
 </div>
 
 <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
   <h2 style="margin-bottom: var(--padding-4x);">Validation Checks</h2>
-  <p style="margin-bottom: var(--padding-4x);">Menta runs 8 validation checks across the challenge lifecycle:</p>
+  <p style="margin-bottom: var(--padding-4x);">Menta runs multiple validation checks across the challenge lifecycle:</p>
   <ol style="padding-left: var(--padding-6x);">
-    <li style="margin-bottom: var(--padding-3x);"><strong>Rate limit per IP.</strong> Prevents brute-force from a single address.</li>
-    <li style="margin-bottom: var(--padding-3x);"><strong>Bot signal checks.</strong> Flags automated traffic patterns.</li>
-    <li style="margin-bottom: var(--padding-3x);"><strong>Session validity.</strong> Verifies session exists, hasn't expired, and matches IP.</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Rate limit per IP / tenant / global.</strong> Prevents brute-force from a single address or tenant.</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Bot signal checks.</strong> Flags automated traffic patterns and known bad user agents.</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Browser signals.</strong> Validates Origin and basic browser characteristics without fingerprinting.</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Session validity.</strong> Verifies session exists, hasn't expired, and matches IP prefix.</li>
     <li style="margin-bottom: var(--padding-3x);"><strong>Session signature.</strong> HMAC proves session originated from this server.</li>
     <li style="margin-bottom: var(--padding-3x);"><strong>Challenge signature.</strong> HMAC proves challenge originated from this server.</li>
     <li style="margin-bottom: var(--padding-3x);"><strong>Nonce entropy.</strong> Ensures nonce isn't precomputed or reused.</li>
     <li style="margin-bottom: var(--padding-3x);"><strong>Proof-of-work.</strong> Hash must meet target difficulty.</li>
     <li style="margin-bottom: var(--padding-3x);"><strong>Client pattern.</strong> Solve time analyzed against human range.</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Token single-use.</strong> Redeemed tokens are consumed on /verify via jti.</li>
   </ol>
 </div>
 
@@ -79,6 +92,17 @@
     <li style="margin-bottom: var(--padding-3x);"><strong>Fast solves</strong> trigger difficulty increase (possible bot)</li>
     <li style="margin-bottom: var(--padding-3x);"><strong>Many failures</strong> significantly increase difficulty</li>
     <li style="margin-bottom: var(--padding-3x);"><strong>Consistent patterns</strong> may indicate automation</li>
+  </ul>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Privacy by design</h2>
+  <ul style="padding-left: var(--padding-6x);">
+    <li style="margin-bottom: var(--padding-3x);"><strong>No cookies, no localStorage.</strong> Widget and shield hold state in memory only.</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>IP anonymization.</strong> By default only the /24 (IPv4) or /64 (IPv6) prefix is used; full IP only if LOG_IP_FULL is enabled.</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Data retention.</strong> Expired challenges, sessions and tokens are cleaned automatically (DATA_RETENTION_HOURS, default 24h).</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Encryption.</strong> SQLCipher at rest + TLS in transit.</li>
+    <li style="margin-bottom: var(--padding-3x);"><strong>Rights.</strong> /admin/export-data and /admin/delete-data for data subject requests.</li>
   </ul>
 </div>
 

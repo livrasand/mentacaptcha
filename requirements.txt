@@ -4,3 +4,4 @@ python-dotenv
 pyotp
 qrcode
 sqlcipher3
+geoip2

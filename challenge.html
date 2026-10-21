@@ -10,52 +10,50 @@
 <link rel="stylesheet" href="/css/global.css">
 <script src="/js/header.js" defer></script>
 <style>
-  .challenge-wrap {
-    min-height: calc(100vh - 64px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--padding-8x) var(--padding-6x);
-    box-sizing: border-box;
-  }
-  .challenge-card {
-    background: var(--color-card);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    padding: var(--padding-8x);
-    max-width: 420px;
-    width: 100%;
-    text-align: center;
-    box-sizing: border-box;
-  }
   .challenge-spinner {
     width: var(--spinner-size);
     height: var(--spinner-size);
     margin: 0 auto var(--padding-6x);
-    border: 3px solid var(--border-color);
+    border: 2px solid var(--color-card-contrast);
     border-top-color: var(--color-primary);
     border-radius: 50%;
     animation: challenge-spin 0.8s linear infinite;
   }
   @keyframes challenge-spin { to { transform: rotate(360deg); } }
-  .challenge-error { color: var(--color-error); }
-  .challenge-ok { color: var(--color-primary); }
+  @media (prefers-reduced-motion: reduce) {
+    .challenge-spinner { animation: none; }
+  }
+  .challenge-error { color: var(--color-error); font-weight: var(--font-weight-bold); }
+  .challenge-ok { color: var(--color-primary); font-weight: var(--font-weight-bold); }
 </style>
 </head>
 <body>
 
 {% include 'nav.html' %}
 
-<main class="challenge-wrap" style="flex-direction: column;">
-  <div class="challenge-card">
+<div class="container" style="padding: var(--padding-12x) var(--padding-6x) var(--padding-12x); max-width: 640px; margin: 0 auto;">
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-8x);">
+  <div style="text-align: center;">
+
     <div id="spinner" class="challenge-spinner" aria-hidden="true"></div>
-    <h1 style="font-size: 1.35rem; margin: 0 0 var(--padding-4x); font-weight: 700; line-height: 1.3;" id="heading">Verifying you are human</h1>
-    <p id="status" style="color: var(--value-color); margin: 0 0 var(--padding-4x); font-size: 0.95rem;">This is a quick proof-of-work check. No cookies, no tracking, no puzzles to solve.</p>
-    <p id="meta" style="color: var(--value-color); font-size: var(--font-size-small); margin: 0 0 var(--padding-6x); min-height: 1.2em;"></p>
-    <button id="retry" class="button" type="button" style="display: none;">Try again</button>
-    <p style="color: var(--value-color); font-size: var(--font-size-small); margin: var(--padding-6x) 0 0;">Performance test by <a href="https://github.com/livrasand/mentacaptcha" target="_blank" rel="noopener">Menta</a> &middot; privacy-first CAPTCHA</p>
+
+    <h1 id="heading" style="font-size: 1.75rem; margin: 0 0 var(--padding-4x); font-weight: 800; line-height: 1.15;">Verifying you are human</h1>
+
+    <p id="status" style="font-size: 1.05rem; color: var(--value-color); margin: 0 auto var(--padding-4x); max-width: 460px;">This is a quick proof-of-work check. No cookies, no tracking, no puzzles to solve.</p>
+
+    <p id="meta" style="color: var(--value-color); font-size: var(--font-size-small); margin: 0 auto var(--padding-4x); max-width: 460px; min-height: 1.2em;"></p>
+
+    <div style="margin-bottom: var(--padding-4x);"><button id="retry" class="button" type="button" style="display: none;">Try again</button></div>
+
+    <p style="color: var(--value-color); font-size: var(--font-size-small); margin: 0 auto; max-width: 460px;">Performance test by <a href="https://github.com/livrasand/mentacaptcha" target="_blank" rel="noopener">Menta</a> &middot; privacy-first CAPTCHA</p>
+
   </div>
-</main>
+</div>
+
+</div>
+
+{% include 'footer.html' %}
 
 <script>
 (function () {
@@ -96,18 +94,16 @@
   var next = params.get('next') || '/'
   if (!sameOriginPattern.test(next) || next.length > 2048) next = '/'
 
-  if (!window.crypto || !crypto.subtle) {
-    if (window.isSecureContext === true || window.isSecureContext === undefined) {
-      showSpinner(false)
-      showRetry(false)
-      setStatus('This check requires a browser with JavaScript and Web Crypto enabled.', 'error')
-      return
-    }
-  }
   if (window.isSecureContext !== true && window.isSecureContext !== undefined) {
     showSpinner(false)
     showRetry(false)
     setStatus('An HTTPS connection is needed to run this security check.', 'error')
+    return
+  }
+  if (!window.crypto || !crypto.subtle) {
+    showSpinner(false)
+    showRetry(false)
+    setStatus('This check requires a browser with JavaScript and Web Crypto enabled.', 'error')
     return
   }
 
@@ -121,15 +117,6 @@
         return { status: res.status, data: data }
       })
     })
-  }
-
-  function storeClearance (clearanceToken) {
-    try {
-      localStorage.setItem('menta_shield_clearance', JSON.stringify({
-        token: clearanceToken,
-        ts: Date.now()
-      }))
-    } catch (e) { /* private mode */ }
   }
 
   function goNext () {
@@ -227,7 +214,6 @@
             challenge_signature: data.challenge.challenge_signature
           }).then(function (r2) {
             if (r2.data && r2.data.success && r2.data.clearance_token) {
-              storeClearance(r2.data.clearance_token)
               if (metaEl) {
                 metaEl.textContent = 'Proof completed in ' + ctx.elapsed.toFixed(2) + ' s (' + new Intl.NumberFormat('en-US').format(ctx.hashes) + ' hashes).'
               }

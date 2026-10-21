@@ -35,3 +35,6 @@ build/
 # macOS / sistema
 .DS_Store
 Thumbs.db
+
+# GeoIP (optional, large/licensed data)
+geoip/*.mmdb

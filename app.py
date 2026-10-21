@@ -1,8 +1,11 @@
 import base64
+import collections
 import hashlib
 import hmac
 import ipaddress
 import io
+import threading
+import analytics
 import bot_shield
 import jwt
 import os
@@ -97,12 +100,88 @@ def get_client_ip():
 
 DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), "menta.db"))
 DB_ENCRYPTION_KEY = os.environ.get('DB_ENCRYPTION_KEY', '')
-DATA_RETENTION_HOURS = int(os.environ.get('DATA_RETENTION_HOURS', 24))
 LOG_IP_FULL = os.environ.get('LOG_IP_FULL', 'false').lower() in ('1', 'true', 'yes', 'on')
+
+
+def _env_int(name, default):
+    """Lee una variable de entorno entera sin romper el arranque si es invalida."""
+    raw = os.environ.get(name)
+    if raw is None or str(raw).strip() == '':
+        return default
+    try:
+        return int(str(raw).strip())
+    except (TypeError, ValueError):
+        print('[CONFIG] %s invalido (%r), se usa %s' % (name, raw, default))
+        return default
+
+
+DATA_RETENTION_HOURS = _env_int('DATA_RETENTION_HOURS', 24)
+
+# --- Analiticas de trafico (privacy-first) ----------------------------------
+# Las IPs nunca se persisten en claro: solo se guarda un pseudonimo HMAC.
+ANALYTICS_ENABLED = os.environ.get('ANALYTICS_ENABLED', 'true').lower() in ('1', 'true', 'yes', 'on')
+ANALYTICS_RETENTION_HOURS = _env_int('ANALYTICS_RETENTION_HOURS', DATA_RETENTION_HOURS)
+# El rate de muestreo (ANALYTICS_LOG_SAMPLE_RATE) lo aplica el modulo analytics.
+# Solo se registran estos endpoints (whitelist). Admin y estaticos quedan fuera.
+ANALYTICS_ENDPOINTS = (
+    '/init',
+    '/challenge',
+    '/redeem',
+    '/verify',
+    '/challenge-page',
+    '/shield/check',
+    '/shield/redeem',
+    '/shield/verify',
+)
 
 CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '')
 CORS_MODE = os.environ.get('CORS_MODE', 'strict')  # strict or permissive
-PROXY_FAIL_CLOSED = os.environ.get('PROXY_FAIL_CLOSED', 'true').lower() in ('1', 'true', 'yes', 'on')
+
+# Modo ante peticiones con headers de proxy cuando el origen no es confiable:
+#   - 'fail_closed' (por defecto): rechaza la peticion con 400.
+#   - 'warn': sigue sirviendo la peticion pero registra una advertencia
+#     (rate-limited) para que sea visible en los logs.
+#   - 'off': desactiva el check por completo.
+_raw_proxy_fail_closed = os.environ.get('PROXY_FAIL_CLOSED', 'true').strip().lower()
+if _raw_proxy_fail_closed in ('1', 'true', 'yes', 'on'):
+    PROXY_FAIL_MODE = 'fail_closed'
+elif _raw_proxy_fail_closed == 'warn':
+    PROXY_FAIL_MODE = 'warn'
+elif _raw_proxy_fail_closed in ('', '0', 'false', 'no', 'off'):
+    PROXY_FAIL_MODE = 'off'
+else:
+    print('[CONFIG] PROXY_FAIL_CLOSED invalido (%r), se usa fail_closed. Valores: fail_closed | warn | off' % _raw_proxy_fail_closed)
+    PROXY_FAIL_MODE = 'fail_closed'
+
+
+def _warn_proxy_misconfiguration(remote):
+    """Registra una advertencia de proxy mal configurado (max 1 cada 60s)."""
+    now = time.time()
+    if now - _warn_proxy_misconfiguration.last_log < _warn_proxy_misconfiguration.interval:
+        return
+    _warn_proxy_misconfiguration.last_log = now
+    print(
+        '[PROXY] Cabeceras de proxy detectadas pero remote_addr (%s) no esta en TRUSTED_PROXIES; '
+        'las cabeceras de cliente se ignoran. Configura TRUSTED_PROXIES con las IPs/CIDRs de tu '
+        'proxy (Cloudflare, nginx, ...) o ajusta PROXY_FAIL_CLOSED (fail_closed | warn | off).'
+        % remote
+    )
+
+_warn_proxy_misconfiguration.last_log = 0.0
+_warn_proxy_misconfiguration.interval = 60
+
+# Aviso al arrancar: si no hay proxies de confianza configurados, cualquier
+# desplegable detrás de Cloudflare/nginx (o un atacante enviando headers de
+# proxy a Menta expuesto a internet) dispara el check de misconfiguration.
+if not os.environ.get('TRUSTED_PROXIES', '').strip():
+    print(
+        '[CONFIG] TRUSTED_PROXIES no esta configurado. Si Menta corre detras de un proxy '
+        'reverso (Cloudflare, nginx, ...) configuralo con las IPs/CIDRs del proxy para resolver '
+        'la IP del cliente. Con PROXY_FAIL_CLOSED=%s las peticiones con headers de proxy '
+        '(CF-Connecting-IP, X-Forwarded-For, X-Real-IP) desde origenes no confiables se '
+        'rechazan con 400; usa PROXY_FAIL_CLOSED=warn para avisar en log sin rechazar, u off '
+        'para desactivar el check.' % PROXY_FAIL_MODE
+    )
 
 RL_INIT_PER_TENANT = os.environ.get('RL_INIT_PER_TENANT', '60,3600')
 RL_CHALLENGE_PER_TENANT = os.environ.get('RL_CHALLENGE_PER_TENANT', '120,3600')
@@ -123,36 +202,127 @@ SHIELD_CLEARANCE_TTL = int(os.environ.get('SHIELD_CLEARANCE_TTL', '86400'))
 # Dificultad del PoW invisible del shield (4 ceros ≈ ~70k hashes ≈ <2s en JS).
 SHIELD_DIFFICULTY = os.environ.get('SHIELD_DIFFICULTY', '0000')
 
+# Rate limits del shield. /shield/* no valida Origin por diseño, así que el
+# cupo por prefijo /24 se quema fácilmente: un único atacante podría bloquear
+# a todo un ISP. Por eso el límite primario usa la IP exacta pseudonimizada
+# (HMAC-SHA256, irreversible y sin almacenar la IP en claro) y el prefijo
+# solo actúa como backstop con un cupo mucho más generoso.
+RL_SHIELD_CHECK_PER_IP = os.environ.get('RL_SHIELD_CHECK_PER_IP', '20,60')
+RL_SHIELD_REDEEM_PER_IP = os.environ.get('RL_SHIELD_REDEEM_PER_IP', '10,60')
+RL_SHIELD_CHECK_PREFIX = os.environ.get('RL_SHIELD_CHECK_PREFIX', '120,60')
+RL_SHIELD_REDEEM_PREFIX = os.environ.get('RL_SHIELD_REDEEM_PREFIX', '60,60')
+
 # Días de inactividad tras los cuales se purgan cuentas y dominios obsoletos.
 ACCOUNT_INACTIVITY_DAYS = int(os.environ.get('ACCOUNT_INACTIVITY_DAYS', 365))
 
 
-def get_db():
-    """Open the database. If DB_ENCRYPTION_KEY is set, use SQLCipher via sqlcipher3."""
+# --- Conexiones -------------------------------------------------------------
+
+# Pool de conexiones por proceso. Abrir una conexion SQLite (y descifrar la
+# key/master con SQLCipher) en cada llamada era lo mas caro del request path;
+# con el pool se conecta una vez por worker y las llamadas reutilizan conexiones.
+_DB_POOL = []
+_DB_POOL_LOCK = threading.Lock()
+_DB_POOL_SIZE = _env_int('DB_CONN_POOL_SIZE', 8)
+_DB_READY_LOCK = threading.Lock()
+_DB_READY = False
+_DB_WARNED_PLAIN = False
+
+
+def _open_connection():
+    """Abre una conexion nueva con los PRAGMA de rendimiento aplicados."""
+    global _DB_WARNED_PLAIN, _DB_READY
     use_sqlcipher = DB_ENCRYPTION_KEY and sqlcipher3 is not None
     if use_sqlcipher:
-        conn = sqlcipher3.connect(DB_PATH)
-        conn.row_factory = sqlcipher3.Row
-        # Safe string literal for the PRAGMA key
-        key_escaped = DB_ENCRYPTION_KEY.replace("'", "''")
-        conn.execute("PRAGMA key='{}'".format(key_escaped))
-        try:
-            conn.execute("SELECT 1")
-        except Exception:
-            # If the existing DB is plain, back it up and create a fresh encrypted one.
-            if os.path.exists(DB_PATH):
-                backup = DB_PATH + '.legacy-' + str(int(time.time()))
-                os.rename(DB_PATH, backup)
-                print('[DB] Backed up plain database to:', backup)
-            conn = sqlcipher3.connect(DB_PATH)
+        # La migracion (cifrar una BD en claro) solo puede pasar una vez y en un
+        # solo hilo; el resto de conexiones van directo a abrir con clave.
+        with _DB_READY_LOCK:
+            migrate_plain = not _DB_READY and os.path.exists(DB_PATH)
+            conn = sqlcipher3.connect(DB_PATH, check_same_thread=False)
             conn.row_factory = sqlcipher3.Row
+            # Safe string literal for the PRAGMA key
+            key_escaped = DB_ENCRYPTION_KEY.replace("'", "''")
             conn.execute("PRAGMA key='{}'".format(key_escaped))
+            if migrate_plain:
+                try:
+                    conn.execute("SELECT 1")
+                except Exception:
+                    # If the existing DB is plain, back it up and create a fresh encrypted one.
+                    backup = DB_PATH + '.legacy-' + str(int(time.time()))
+                    conn.close()
+                    os.rename(DB_PATH, backup)
+                    print('[DB] Backed up plain database to:', backup)
+                    conn = sqlcipher3.connect(DB_PATH, check_same_thread=False)
+                    conn.row_factory = sqlcipher3.Row
+                    conn.execute("PRAGMA key='{}'".format(key_escaped))
+                _DB_READY = True
     else:
-        if DB_ENCRYPTION_KEY and sqlcipher3 is None:
+        if DB_ENCRYPTION_KEY and sqlcipher3 is None and not _DB_WARNED_PLAIN:
+            _DB_WARNED_PLAIN = True
             print('[WARN] DB_ENCRYPTION_KEY is set but sqlcipher3 is not installed; using plain sqlite3.')
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, check_same_thread=False)
         conn.row_factory = sqlite3.Row
+    # WAL permite lectores concurrentes; synchronous=NORMAL ya no pierde datos
+    # ante una caida del proceso (solo ante corte de energia) y evita el fsync
+    # por commit, el principal cuello de botella de escritura.
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    # Espera hasta 5s el lock de escritura antes de fallar con 'database is
+    # locked' (varios workers gunicorn escribiendo a la vez).
+    conn.execute("PRAGMA busy_timeout=5000")
     return conn
+
+
+class _PooledConnection:
+    """Wrapper que replica la semantica de `with conn` de sqlite3 y al salir
+    devuelve la conexion al pool en lugar de cerrarla."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+    def __enter__(self):
+        return self._conn
+
+    def __exit__(self, exc_type, exc_val, tb):
+        conn = self._conn
+        healthy = True
+        try:
+            if exc_type is None:
+                if conn.in_transaction:
+                    conn.commit()
+            else:
+                try:
+                    conn.rollback()
+                except Exception:
+                    healthy = False
+        except Exception:
+            # El error se propaga (misma semantica que `with conn` de sqlite3),
+            # pero una conexion en estado dudoso se cierra y no vuelve al pool.
+            healthy = False
+            raise
+        finally:
+            if healthy:
+                with _DB_POOL_LOCK:
+                    if len(_DB_POOL) < _DB_POOL_SIZE:
+                        _DB_POOL.append(conn)
+                        conn = None
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+        return False
+
+
+def get_db():
+    """Open the database. If DB_ENCRYPTION_KEY is set, use SQLCipher via sqlcipher3."""
+    with _DB_POOL_LOCK:
+        if _DB_POOL:
+            return _PooledConnection(_DB_POOL.pop())
+    return _PooledConnection(_open_connection())
 
 def init_db():
     with get_db() as conn:
@@ -220,7 +390,8 @@ def init_db():
             CREATE TABLE IF NOT EXISTS admin_2fa (
                 id INTEGER PRIMARY KEY,
                 secret TEXT NOT NULL,
-                created_at REAL NOT NULL
+                created_at REAL NOT NULL,
+                confirmed INTEGER NOT NULL DEFAULT 1
             )
         """)
         conn.execute("""
@@ -232,7 +403,7 @@ def init_db():
                 created_at REAL NOT NULL
             )
         """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_totp_recovery ON totp_recovery_codes(owner, used)")
+        conn.execute("""CREATE INDEX IF NOT EXISTS idx_totp_recovery ON totp_recovery_codes(owner, used)""")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS solved_challenges (
                 tenant_id TEXT NOT NULL DEFAULT '',
@@ -319,6 +490,9 @@ def _migrate():
             )
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_domain_history ON domain_history(account_number, status, last_active_at)")
+        cols_dh = {r[1] for r in conn.execute("PRAGMA table_info(domain_history)").fetchall()}
+        if "paid" not in cols_dh:
+            conn.execute("ALTER TABLE domain_history ADD COLUMN paid INTEGER NOT NULL DEFAULT 0")
         cols_aal = {r[1] for r in conn.execute("PRAGMA table_info(admin_access_log)").fetchall()}
         if "admin_access_log" not in {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}:
             conn.execute("""
@@ -330,13 +504,46 @@ def _migrate():
                     timestamp REAL NOT NULL
                 )
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_aal ON admin_access_log(endpoint, timestamp)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_aal ON admin_access_log(endpoint, timestamp)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS request_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tenant_id TEXT NOT NULL DEFAULT '',
+                timestamp REAL NOT NULL,
+                ip_hash TEXT NOT NULL DEFAULT '',
+                country TEXT NOT NULL DEFAULT 'Unknown',
+                country_code TEXT NOT NULL DEFAULT 'Unknown',
+                region TEXT NOT NULL DEFAULT 'Unknown',
+                city TEXT NOT NULL DEFAULT 'Unknown',
+                method TEXT NOT NULL DEFAULT '',
+                path TEXT NOT NULL DEFAULT '',
+                endpoint TEXT NOT NULL DEFAULT '',
+                status INTEGER NOT NULL DEFAULT 0,
+                bytes INTEGER NOT NULL DEFAULT 0,
+                duration_ms REAL NOT NULL DEFAULT 0,
+                cache_status TEXT NOT NULL DEFAULT 'DYNAMIC',
+                user_agent TEXT NOT NULL DEFAULT '',
+                browser TEXT NOT NULL DEFAULT 'Unknown',
+                os TEXT NOT NULL DEFAULT 'Unknown',
+                device TEXT NOT NULL DEFAULT 'Unknown',
+                http_version TEXT NOT NULL DEFAULT 'Unknown',
+                referer TEXT NOT NULL DEFAULT '',
+                host TEXT NOT NULL DEFAULT '',
+                colo TEXT NOT NULL DEFAULT 'Unknown',
+                outcome TEXT NOT NULL DEFAULT 'other'
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_rlog_tt ON request_log(tenant_id, timestamp)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_rlog_te ON request_log(tenant_id, endpoint)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_rlog_ti ON request_log(tenant_id, ip_hash)")
+
         # 2FA tables
         conn.execute("""
             CREATE TABLE IF NOT EXISTS admin_2fa (
                 id INTEGER PRIMARY KEY,
                 secret TEXT NOT NULL,
-                created_at REAL NOT NULL
+                created_at REAL NOT NULL,
+                confirmed INTEGER NOT NULL DEFAULT 1
             )
         """)
         conn.execute("""
@@ -348,7 +555,10 @@ def _migrate():
                 created_at REAL NOT NULL
             )
         """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_totp_recovery ON totp_recovery_codes(owner, used)")
+        conn.execute("""CREATE INDEX IF NOT EXISTS idx_totp_recovery ON totp_recovery_codes(owner, used)""")
+        cols_2fa = {r[1] for r in conn.execute("PRAGMA table_info(admin_2fa)").fetchall()}
+        if "confirmed" not in cols_2fa:
+            conn.execute("ALTER TABLE admin_2fa ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 1")
 _migrate()
 
 def _cleanup():
@@ -369,12 +579,118 @@ def _cleanup():
                 ("failed_attempts", "timestamp", min(86400, retention)),
                 ("accounts", "last_seen_at", ACCOUNT_INACTIVITY_DAYS * 86400),
                 ("domain_history", "last_active_at", ACCOUNT_INACTIVITY_DAYS * 86400),
+                ("request_log", "timestamp", max(3600, ANALYTICS_RETENTION_HOURS * 3600)),
             ]:
                 conn.execute("DELETE FROM %s WHERE %s < ?" % (table, col), (now - window,))
         print("[CLEANUP] Expired data removed")
     except Exception as e:
         print("[CLEANUP ERROR] %s" % e)
 _cleanup()
+
+# --- Bufferes de escritura asíncronos flush -----------------------------------
+
+# Auditoría (failed_attempts) y analítica (request_log) no participan en
+# decisiones del request: se acumulan en memoria y un hilo background las
+# vacía en SQLite con executemany. En un crash se pierden a lo sumo los
+# últimos FLUSH_INTERVAL segundos de auditoría, no datos funcionales.
+_FLUSH_INTERVAL = float(os.environ.get('DB_FLUSH_INTERVAL', '3'))
+_FLUSH_BATCH = int(os.environ.get('DB_FLUSH_BATCH', '2000'))
+
+_fail_lock = threading.Lock()
+_fail_queue = collections.deque()
+_fail_index = {}          # (tenant_id, ip) -> deque de timestamps
+_fail_gc_last = 0.0
+
+_analytics_lock = threading.Lock()
+_analytics_queue = collections.deque()
+
+REQUEST_LOG_SQL = """INSERT INTO request_log (
+       tenant_id, timestamp, ip_hash, country, country_code, region, city,
+       method, path, endpoint, status, bytes, duration_ms, cache_status,
+       user_agent, browser, os, device, http_version, referer, host, colo, outcome
+   ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"""
+
+FAILED_ATTEMPTS_SQL = (
+    "INSERT INTO failed_attempts (tenant_id, ip, endpoint, reason, challenge_id, timestamp)"
+    " VALUES (?, ?, ?, ?, ?, ?)")
+
+
+def _recent_failures_count(tenant_id, ip, window):
+    """Fails recientes de (tenant_id, ip) para las senales anti-bot.
+
+    En modo `memory` se lee del indice en memoria que rellena log_failure,
+    equivalente al COUNT(*) sobre failed_attempts que se usaba antes.
+    """
+    bucket = (tenant_id or '', ip or '')
+    now = time.time()
+    cutoff = now - window
+    if RL_BACKEND == 'memory':
+        with _fail_lock:
+            dq = _fail_index.get(bucket)
+            if not dq:
+                return 0
+            while dq and dq[0] <= cutoff:
+                dq.popleft()
+            return len(dq)
+    with get_db() as conn:
+        return conn.execute(
+            "SELECT COUNT(*) FROM failed_attempts WHERE tenant_id = ? AND ip = ? AND timestamp > ?",
+            (tenant_id, ip, cutoff)
+        ).fetchone()[0]
+
+
+def _drain_failure_queue(conn):
+    rows = []
+    global _fail_gc_last
+    now = time.time()
+    with _fail_lock:
+        if _fail_queue:
+            while _fail_queue and len(rows) < _FLUSH_BATCH:
+                rows.append(_fail_queue.popleft())
+        # GC del índice de fallos recientes: la ventana más larga usada es 600s.
+        if now - _fail_gc_last >= 60:
+            _fail_gc_last = now
+            stale = [k for k, dq in _fail_index.items() if not dq or dq[-1] <= now - 900]
+            for k in stale:
+                _fail_index.pop(k, None)
+    if rows:
+        try:
+            conn.executemany(FAILED_ATTEMPTS_SQL, rows)
+        except Exception as e:
+            print('[AUDIT ERROR] %s (se perdieron %d filas)' % (e, len(rows)))
+
+
+def _drain_analytics_queue(conn):
+    rows = []
+    with _analytics_lock:
+        while _analytics_queue and len(rows) < _FLUSH_BATCH:
+            rows.append(_analytics_queue.popleft())
+    if rows:
+        try:
+            conn.executemany(REQUEST_LOG_SQL, rows)
+        except Exception as e:
+            print('[ANALYTICS ERROR] %s (se perdieron %d filas)' % (e, len(rows)))
+
+
+def _drain_queues():
+    fails = len(_fail_queue)
+    analytics_n = len(_analytics_queue)
+    if fails == 0 and analytics_n == 0:
+        return
+    try:
+        with get_db() as conn:
+            _drain_failure_queue(conn)
+            _drain_analytics_queue(conn)
+    except Exception as e:
+        print('[FLUSH ERROR] %s' % e)
+
+
+def _flusher_loop():
+    while True:
+        time.sleep(_FLUSH_INTERVAL)
+        _drain_queues()
+
+threading.Thread(target=_flusher_loop, daemon=True, name='db-flusher').start()
 
 def current_tenant():
     """Identificador de tenant para separación por API key."""
@@ -393,14 +709,131 @@ def set_tenant():
         g.tenant_id = account['account_number'] if account else ''
 
 
-def generate_account_number():
-    """Genera un número de cuenta de 16 dígitos único."""
+def _analytics_endpoint_for(path):
+    """Normaliza la ruta y devuelve el endpoint de la whitelist (o '' si no aplica)."""
+    normalized = analytics.normalize_path(path)
+    if normalized in ANALYTICS_ENDPOINTS:
+        return normalized
+    return ''
+
+
+def _analytics_tenant_for(endpoint):
+    """Tenant al que se atribuye la peticion.
+
+    El trafico de /shield/* vive siempre en su propio bucket (SHIELD_TENANT)
+    para no mezclarse con el de los tenants registrados. El resto usa el tenant
+    resuelto por ``set_tenant()`` (API key u origin), vacio si es anonimo.
+    """
+    if endpoint.startswith('/shield/'):
+        return SHIELD_TENANT
+    return current_tenant()
+
+
+@app.before_request
+def analytics_begin():
+    """Marca el inicio de medicion para los endpoints incluidos en la whitelist."""
+    if not ANALYTICS_ENABLED:
+        return None
+    endpoint = _analytics_endpoint_for(request.path)
+    if not endpoint:
+        return None
+    if not analytics.should_sample():
+        return None
+    g.analytics_start = time.perf_counter()
+    g.analytics_endpoint = endpoint
+    return None
+
+
+def _record_request_log(response):
+    """Inserta la peticion en ``request_log`` usando una IP pseudonimizada."""
+    endpoint = getattr(g, 'analytics_endpoint', '')
+    start = getattr(g, 'analytics_start', None)
+    if not endpoint or start is None:
+        return
+
+    raw_ip = _get_raw_client_ip()
+    ip_hash = analytics.pseudonymize_ip(raw_ip)
+    geo = analytics.geolocate(raw_ip)
+    user_agent = (request.headers.get('User-Agent') or '')[:512]
+    browser, os_name, device = analytics.parse_user_agent(user_agent)
+
+    duration_ms = (time.perf_counter() - start) * 1000.0
+    status = response.status_code
+    size = response.content_length
+    if size is None:
+        try:
+            size = len(response.get_data())
+        except Exception:
+            size = 0
+
+    row = (
+        _analytics_tenant_for(endpoint),
+        time.time(),
+        ip_hash,
+        geo['country'],
+        geo['country_code'],
+        geo['region'],
+        geo['city'],
+        request.method[:16],
+        analytics.normalize_path(request.path)[:256],
+        endpoint,
+        status,
+        int(size or 0),
+        round(duration_ms, 3),
+        analytics.cache_status(response, request),
+        user_agent,
+        browser,
+        os_name,
+        device,
+        analytics.http_version(request),
+        analytics.referer_host(request),
+        (request.headers.get('Host') or '')[:128],
+        analytics.colo(response, request),
+        analytics.classify_outcome(status, response),
+    )
+    with _analytics_lock:
+        _analytics_queue.append(row)
+        # Backpressure: si el flusher se retrasa mucho, descartar lo viejo
+        # (analitica, no funcional) para no crecer sin limite.
+        while len(_analytics_queue) > 10000:
+            _analytics_queue.popleft()
+
+
+@app.after_request
+def analytics_record(response):
+    """Persiste la medicion de la peticion (nunca la IP cruda)."""
+    if getattr(g, 'analytics_endpoint', ''):
+        try:
+            _record_request_log(response)
+        except Exception as e:
+            print('[ANALYTICS ERROR] %s' % e)
+        finally:
+            g.analytics_endpoint = ''
+            g.analytics_start = None
+    return response
+
+
+def generate_account_number(conn, now):
+    """Genera un número de cuenta de 16 dígitos único (la PK resuelve la carrera).
+
+    Inserta usando la MISMA conexión del caller y reintenta en colisión de PK,
+    eliminando el TOCTOU de comprobar existencia en una conexión distinta.
+    El caller completa el resto de campos en la misma transacción.
+    """
     while True:
         number = ''.join(str(secrets.randbelow(10)) for _ in range(16))
-        with get_db() as conn:
-            exists = conn.execute("SELECT 1 FROM accounts WHERE account_number = ?", (number,)).fetchone()
-        if not exists:
+        try:
+            conn.execute(
+                "INSERT INTO accounts (account_number, tenant_id, domains, primary_domain, created_at, last_seen_at, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (number, '', '', '', now, now, None)
+            )
             return number
+        except Exception as e:
+            # sqlcipher3 y sqlite3 tienen clases IntegrityError distintas; da igual
+            # el driver, la-violacion-de-PK la reconocemos por nombre de tipo.
+            if type(e).__name__ != 'IntegrityError':
+                raise
+            continue  # colisión rara; reintentar con otro número
 
 
 def get_account(tenant_id):
@@ -414,13 +847,42 @@ def get_account(tenant_id):
         return None
 
 
-def update_account_last_seen(tenant_id):
-    """Actualiza el último visto de una cuenta."""
+# `last_seen_at` se usa para la purga de cuentas inactivas: no hace falta
+# persistirlo en cada request. Debounce en memoria persiste la marca como
+# maximo una vez por ventana; introduce error de +/- ACCOUNT_LAST_SEEN_FLUSH
+# segundos en la fecha de inactividad (irrelevante con 365 dias de purga).
+_last_seen_lock = threading.Lock()
+_last_seen_cache = {}
+LAST_SEEN_FLUSH_SECONDS = float(os.environ.get('ACCOUNT_LAST_SEEN_FLUSH', '30'))
+
+
+def update_account_last_seen(tenant_id, conn=None):
+    """Actualiza el último visto de una cuenta (con debounce en memoria).
+
+    Si se pasa ``conn`` (transaccion ya abierta del caller), el UPDATE se hace
+    dentro de esa transaccion al evitar un commit extra en el request path.
+    """
     if not tenant_id:
         return
+    now = time.time()
+    with _last_seen_lock:
+        if now - _last_seen_cache.get(tenant_id, 0) < LAST_SEEN_FLUSH_SECONDS:
+            return
+        _last_seen_cache[tenant_id] = now
+        # Bound del cache: cuentas se purgan por inactividad, la lista crece
+        # poco; igualmente evitamos que crezca indefinidamente.
+        if len(_last_seen_cache) > 65536:
+            cutoff = now - LAST_SEEN_FLUSH_SECONDS * 2
+            stale = [k for k, v in _last_seen_cache.items() if v < cutoff]
+            for k in stale:
+                _last_seen_cache.pop(k, None)
     try:
-        with get_db() as conn:
-            conn.execute("UPDATE accounts SET last_seen_at = ? WHERE tenant_id = ? OR account_number = ?", (time.time(), tenant_id, tenant_id))
+        sql = "UPDATE accounts SET last_seen_at = ? WHERE tenant_id = ? OR account_number = ?"
+        if conn is not None:
+            conn.execute(sql, (now, tenant_id, tenant_id))
+        else:
+            with get_db() as c:
+                c.execute(sql, (now, tenant_id, tenant_id))
     except Exception:
         pass
 
@@ -440,9 +902,24 @@ def normalize_domain(value):
         parsed = urllib.parse.urlparse(value)
         host = parsed.hostname
     else:
-        host = value.split('/')[0].split(':')[0]
+        host = value.split('/')[0]
+        # Conservar hosts IPv6 literales con puerto, p. ej. [2001:db8::1]:8080
+        if host.startswith('[') and ']' in host:
+            host = host[1:host.index(']')]
+        else:
+            host = host.split(':')[0]
     if not host:
         return None
+    host = host.strip('[]')
+    # Hosts IPv6 literales: forma canónica entre corchetes en minúsculas
+    if ':' in host:
+        return '[' + host.lower() + ']'
+    # Convertir IDN (unicode) a punycode cuando aplique
+    if not host.isascii():
+        try:
+            host = host.encode('idna').decode('ascii').lower()
+        except UnicodeError:
+            pass
     # Remove leading www. to treat it as root
     if host.startswith('www.'):
         host = host[4:]
@@ -593,8 +1070,9 @@ def _register_domain_for_account(account_number, domain_root, paid=False, status
     try:
         with get_db() as conn:
             conn.execute(
-                "INSERT OR REPLACE INTO domain_history (domain_root, account_number, first_seen_at, last_active_at, status, paid) VALUES (?, ?, COALESCE((SELECT first_seen_at FROM domain_history WHERE domain_root = ?), ?), ?, ?, ?)",
-                (domain_root, account_number, domain_root, now, now, status, 1 if paid else 0)
+                "INSERT INTO domain_history (domain_root, account_number, first_seen_at, last_active_at, status, paid) VALUES (?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(domain_root) DO UPDATE SET account_number = excluded.account_number, last_active_at = excluded.last_active_at, status = excluded.status, paid = excluded.paid",
+                (domain_root, account_number, now, now, status, 1 if paid else 0)
             )
     except Exception:
         pass
@@ -624,6 +1102,52 @@ def _parse_rate_limit(value):
         return None, None
 
 
+# --- Rate limiting en memoria ------------------------------------------------
+
+# Los rate limits no necesitan durabilidad: si el proceso se reinicia, el peor
+# caso es que una ventana se reinicie (el atacante recupera el cupo que perdia
+# con el reinicio del servicio, no puede crear ventanas nuevas). Al vivir en
+# memoria desaparecen del path de transacciones SQLite por completo: ni
+# COUNT(*) sobre filas de log crecientes ni INSERT por request.
+# En despliegues multi-worker (varios gunicorn workers) los cupos son por
+# worker en este modo (limite global = suma suave de los workers); usar
+# RL_BACKEND=sqlite si se necesita un contador unico compartido entre procesos.
+RL_BACKEND = os.environ.get('RL_BACKEND', 'memory')
+
+_rl_lock = threading.Lock()
+_rl_windows = {}   # (tenant_id, ident, endpoint, window) -> deque de timestamps
+_rl_gc_last = 0.0
+
+
+def _rl_prune(deq, cutoff):
+    while deq and deq[0] <= cutoff:
+        deq.popleft()
+
+
+def _rl_allow_memory(tenant_id, ident, endpoint, max_requests, window_seconds):
+    """Ventana deslizante en memoria, mismo criterio que el backend sqlite."""
+    ident = ident or ''
+    now = time.time()
+    cutoff = now - window_seconds
+    with _rl_lock:
+        global _rl_gc_last
+        if now - _rl_gc_last >= 60:
+            _rl_gc_last = now
+            stale = [k for k, dq in _rl_windows.items() if not dq or dq[-1] <= now - 2 * window_seconds]
+            for k in stale:
+                _rl_windows.pop(k, None)
+        key = (tenant_id or '', ident, endpoint, window_seconds)
+        dq = _rl_windows.get(key)
+        if dq is None:
+            dq = collections.deque()
+            _rl_windows[key] = dq
+        _rl_prune(dq, cutoff)
+        if len(dq) >= max_requests:
+            return False
+        dq.append(now)
+        return True
+
+
 def check_rate_limit_tenant(tenant_id, endpoint, limit_str):
     """Rate limit por tenant (cuenta) para mitigar farms distribuidas."""
     if not tenant_id or not limit_str:
@@ -631,6 +1155,8 @@ def check_rate_limit_tenant(tenant_id, endpoint, limit_str):
     max_requests, window = _parse_rate_limit(limit_str)
     if max_requests is None:
         return True
+    if RL_BACKEND == 'memory':
+        return _rl_allow_memory(tenant_id, '', endpoint, max_requests, window)
     now = time.time()
     with get_db() as conn:
         count = conn.execute(
@@ -651,6 +1177,8 @@ def check_rate_limit_global(endpoint, limit_str):
     max_requests, window = _parse_rate_limit(limit_str)
     if max_requests is None:
         return True
+    if RL_BACKEND == 'memory':
+        return _rl_allow_memory('__global__', '', endpoint, max_requests, window)
     now = time.time()
     with get_db() as conn:
         count = conn.execute(
@@ -712,10 +1240,7 @@ def get_difficulty(ip, tenant_id=''):
             "SELECT nonce, solve_time FROM solved_challenges WHERE tenant_id = ? AND ip = ? AND timestamp > ?",
             (tenant_id, ip, now - 3600)
         ).fetchall()
-        fails = conn.execute(
-            "SELECT COUNT(*) FROM failed_attempts WHERE tenant_id = ? AND ip = ? AND timestamp > ?",
-            (tenant_id, ip, now - 600)
-        ).fetchone()[0]
+    fails = _recent_failures_count(tenant_id, ip, 600)
 
     if not solves:
         if fails > 2:
@@ -742,47 +1267,71 @@ def get_difficulty(ip, tenant_id=''):
     return _max_difficulty(result, MIN_DIFFICULTY)
 
 def log_failure(ip, endpoint, reason, challenge_id=None, tenant_id=''):
-    """Logs a failed attempt for audit and attack detection."""
+    """Logs a failed attempt for audit and attack detection.
+
+    No toca SQLite en el request path: encola para el flusher y, en modo
+    `memory`, alimenta el indice en memoria que consume check_bot_signals /
+    get_difficulty. Solo se pierde la ultima ventana de auditoria (de ahi a
+    DB_FLUSH_INTERVAL segundos) si el proceso muere.
+    """
+    if not ip and not tenant_id:
+        return
+    row = (tenant_id or '', ip or '', endpoint, reason, challenge_id, time.time())
     try:
-        with get_db() as conn:
-            conn.execute(
-                "INSERT INTO failed_attempts (tenant_id, ip, endpoint, reason, challenge_id, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
-                (tenant_id, ip, endpoint, reason, challenge_id, time.time())
-            )
+        with _fail_lock:
+            _fail_queue.append(row)
+            # Backpressure: descartar lo mas viejo si el flusher se atrasa
+            # (p.ej. ataque masivo); acota memoria, no es dato funcional.
+            while len(_fail_queue) > 100000:
+                _fail_queue.popleft()
+            dq = _fail_index.get((row[0], row[1]))
+            if dq is None:
+                dq = collections.deque()
+                _fail_index[(row[0], row[1])] = dq
+            dq.append(row[5])
+            while dq and dq[0] <= row[5] - 900:
+                dq.popleft()
     except Exception as e:
         print("[AUDIT ERROR] %s" % e)
 
-def check_rate_limit(ip, endpoint, max_requests, window_seconds, tenant_id=''):
+def check_rate_limit(ip, endpoint, max_requests, window_seconds, tenant_id='', key=None):
+    """Limita peticiones por identificador de red (``key`` si se pasa, ``ip`` si no).
+
+    ``key`` permite limitar por otro identificador (ej. pseudonimo HMAC de la
+    IP completa) sin alterar lo que se audita en ``failed_attempts``.
+    """
+    bucket = key or ip
+    if RL_BACKEND == 'memory':
+        return _rl_allow_memory(tenant_id, bucket, endpoint, max_requests, window_seconds)
     now = time.time()
     with get_db() as conn:
         count = conn.execute(
             "SELECT COUNT(*) FROM rate_limits WHERE tenant_id = ? AND ip = ? AND endpoint = ? AND timestamp > ?",
-            (tenant_id, ip, endpoint, now - window_seconds)
+            (tenant_id, bucket, endpoint, now - window_seconds)
         ).fetchone()[0]
         if count >= max_requests:
             return False
         conn.execute(
             "INSERT INTO rate_limits (tenant_id, ip, endpoint, timestamp) VALUES (?, ?, ?, ?)",
-            (tenant_id, ip, endpoint, now)
+            (tenant_id, bucket, endpoint, now)
         )
     return True
 
+
+def shield_ip_key():
+    """Pseudonimo HMAC-SHA256 de la IP completa, solo para rate limiting del shield.
+
+    A diferencia de ``get_client_ip()`` (que trunca a /24 o /64 para minimizar
+    datos personales), este identificador distingue IPs individuales sin
+    revelarlas: sin la sal (``ANALYTICS_IP_SALT`` o ``SECRET_KEY``) es
+    irreversible. Se usa solo como clave de cupo, no se audita ni se muestra.
+    """
+    return 'hmac:' + analytics.pseudonymize_ip(_get_raw_client_ip())
+
 def check_bot_signals(ip, tenant_id=''):
     """Detects IPs with suspicious patterns before spending resources on challenge."""
-    now = time.time()
-    with get_db() as conn:
-        recent_fails = conn.execute(
-            "SELECT COUNT(*) FROM failed_attempts WHERE tenant_id = ? AND ip = ? AND timestamp > ?",
-            (tenant_id, ip, now - 600)
-        ).fetchone()[0]
-        if recent_fails > 5:
-            return True, "too_many_failures"
-        recent_challenges = conn.execute(
-            "SELECT COUNT(*) FROM rate_limits WHERE tenant_id = ? AND ip = ? AND endpoint = '/challenge' AND timestamp > ?",
-            (tenant_id, ip, now - 60)
-        ).fetchone()[0]
-        if recent_challenges > 5:
-            return True, "challenge_flood"
+    if _recent_failures_count(tenant_id, ip, 600) > 5:
+        return True, "too_many_failures"
     return False, None
 
 def check_nonce_entropy(ip, nonce, tenant_id=''):
@@ -806,7 +1355,7 @@ def check_nonce_entropy(ip, nonce, tenant_id=''):
                 "SELECT COUNT(*) FROM solved_challenges WHERE tenant_id = ? AND ip = ? AND nonce < 100 AND timestamp > ?",
                 (tenant_id, ip, now - 3600)
             ).fetchone()[0]
-            if count > 3:
+            if count > 2:
                 return False, "low_nonce_pattern"
     return True, None
 
@@ -820,6 +1369,8 @@ def check_client_pattern(ip, solve_time, nonce=None, tenant_id=''):
         ).fetchall()
     if len(rows) < 5:
         return True, None
+    if solve_time is not None and solve_time < 0.03:
+        return False, "solve_too_fast"
     times = [r["solve_time"] for r in rows]
     mean = sum(times) / len(times)
     variance = sum((t - mean) ** 2 for t in times) / len(times)
@@ -840,10 +1391,12 @@ def enforce_proxy_and_cors():
     # El widget de protección universal (menta-shield.js) funciona en cualquier
     # página sin registro previo: no aplicamos el check de origen.
     if request.path.startswith('/shield/') or request.path == '/menta-shield.js':
-        if request.method == 'OPTIONS':
-            return None
-        if check_proxy_misconfiguration() and PROXY_FAIL_CLOSED:
-            return jsonify({"success": False, "error": "Proxy misconfiguration. TRUSTED_PROXIES must be set."}), 400
+        if request.method != 'OPTIONS':
+            if check_proxy_misconfiguration():
+                if PROXY_FAIL_MODE == 'fail_closed':
+                    return jsonify({"success": False, "error": "Proxy misconfiguration. TRUSTED_PROXIES must be set."}), 400
+                if PROXY_FAIL_MODE == 'warn':
+                    _warn_proxy_misconfiguration(request.remote_addr or "unknown")
         return None
 
     if request.method == 'OPTIONS':
@@ -858,8 +1411,10 @@ def enforce_proxy_and_cors():
         return None
 
     if check_proxy_misconfiguration():
-        if PROXY_FAIL_CLOSED:
+        if PROXY_FAIL_MODE == 'fail_closed':
             return jsonify({"success": False, "error": "Proxy misconfiguration. TRUSTED_PROXIES must be set."}), 400
+        if PROXY_FAIL_MODE == 'warn':
+            _warn_proxy_misconfiguration(request.remote_addr or "unknown")
 
     origin = request.headers.get('Origin')
     if origin and not is_origin_allowed(current_tenant(), origin):
@@ -896,11 +1451,11 @@ def cors(response):
 def security_headers(response):
     """Añade headers de seguridad y privacidad a cada respuesta."""
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['X-XSS-Protection'] = '0'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     response.headers['Permissions-Policy'] = 'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()'
-    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self';"
     return response
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
@@ -915,8 +1470,7 @@ ADMIN_TOKEN_READONLY = os.environ.get("ADMIN_TOKEN_READONLY", '')
 
 def _admin_authorized(readonly=False, skip_totp=False):
     """Valida token de admin. readonly=True permite el token de solo lectura.
-    Cuando 2FA admin está configurado, requiere además X-Admin-TOTP o X-Admin-Recovery-Code,
-    a menos que exista una sesión recordada activa.
+    Cuando 2FA admin está configurado, requiere además X-Admin-TOTP o X-Admin-Recovery-Code.
     skip_totp permite endpoints de setup 2FA sin código TOTP.
     """
     auth = request.headers.get('Authorization', '')
@@ -931,17 +1485,9 @@ def _admin_authorized(readonly=False, skip_totp=False):
     if skip_totp:
         if token_type:
             return True, token_type, False
-        # Check remembered session for setup endpoints
-        required_type = 'full' if not readonly else None
-        if _admin_session_valid(required_type):
-            return True, session.get('admin_token_type', 'full'), False
         return False, None, False
 
     if not token_type:
-        # Check remembered session
-        required_type = 'full' if not readonly else None
-        if _admin_session_valid(required_type):
-            return True, session.get('admin_token_type', 'full'), False
         return False, None, False
 
     # TOTP admin
@@ -950,58 +1496,30 @@ def _admin_authorized(readonly=False, skip_totp=False):
         totp = request.headers.get('X-Admin-TOTP', '')
         recovery = request.headers.get('X-Admin-Recovery-Code', '')
         if totp and pyotp.TOTP(admin_secret).verify(totp, valid_window=1):
-            remember = request.headers.get('X-Remember-Me', 'false').lower() == 'true'
-            _refresh_admin_session(token_type, remember)
             return True, token_type, False
         if recovery and _consume_recovery_code('__admin__', recovery):
-            remember = request.headers.get('X-Remember-Me', 'false').lower() == 'true'
-            _refresh_admin_session(token_type, remember)
-            return True, token_type, False
-        # Check remembered session for this token
-        if _admin_session_valid(token_type):
             return True, token_type, False
         return False, None, False
     # No admin 2FA configured -> force setup
     return False, None, True
 
 
-def _admin_session_valid(token_type=None):
-    """Verifica si existe una sesión de admin recordada activa."""
-    try:
-        session_token = session.get('admin_token')
-        session_expires = session.get('admin_session_expires', 0)
-        if not session_token or not session_expires or session_expires < time.time():
-            return False
-        if session_token not in (ADMIN_TOKEN, ADMIN_TOKEN_READONLY):
-            return False
-        session_token_type = session.get('admin_token_type')
-        if token_type and session_token_type != token_type:
-            return False
-        return True
-    except Exception:
-        return False
-
-
-def _refresh_admin_session(token_type, remember=True):
-    """Refresca o crea la sesión de admin."""
-    try:
-        session['admin_token'] = ADMIN_TOKEN if token_type == 'full' else ADMIN_TOKEN_READONLY
-        session['admin_token_type'] = token_type
-        session['admin_2fa_verified'] = True
-        session['admin_session_expires'] = time.time() + (30 * 24 * 60 * 60)
-        if remember:
-            session.permanent = True
-        else:
-            session.permanent = False
-    except Exception:
-        pass
-
 
 def _get_admin_totp_secret():
-    """Devuelve el secret TOTP del admin, o None si no está configurado."""
+    """Devuelve el secret TOTP del admin confirmado, o None si no está configurado."""
     try:
         with get_db() as conn:
-            row = conn.execute("SELECT secret FROM admin_2fa WHERE id = 1").fetchone()
+            row = conn.execute("SELECT secret FROM admin_2fa WHERE id = 1 AND confirmed = 1").fetchone()
+            return row['secret'] if row else None
+    except Exception:
+        return None
+
+
+def _get_admin_pending_secret():
+    """Devuelve el secret TOTP pendiente de verificar por el admin, o None."""
+    try:
+        with get_db() as conn:
+            row = conn.execute("SELECT secret FROM admin_2fa WHERE id = 1 AND confirmed = 0").fetchone()
             return row['secret'] if row else None
     except Exception:
         return None
@@ -1080,7 +1598,7 @@ def demo():
     # Aplicamos la lógica de bot_shield antes de servir la página de demo.
     ua = request.headers.get('User-Agent', '')
     ip = get_client_ip()
-    decision = bot_shield.evaluate_request(ua, ip, request.path)
+    decision = bot_shield.evaluate_request(ua, ip, request.path, request.headers.get('X-JA4-Fingerprint') or request.headers.get('X-JA3-Fingerprint'))
     if decision['action'] == 'block':
         # Bloqueamos a bots que explícitamente violen robots.txt y estén verificados.
         return jsonify({"error": "Access denied"}), 403
@@ -1151,7 +1669,7 @@ def init_session():
 
     # bot_shield: los bots conocidos que violan robots.txt y están verificados
     # se bloquean aquí; el resto del veredicto se aplica en /challenge.
-    shield_verdict = bot_shield.evaluate_request(request.headers.get('User-Agent', ''), ip, request.path)
+    shield_verdict = bot_shield.evaluate_request(request.headers.get('User-Agent', ''), ip, request.path, request.headers.get('X-JA4-Fingerprint') or request.headers.get('X-JA3-Fingerprint'))
     if shield_verdict['action'] == 'block':
         log_failure(ip, '/init', 'bot_shield_' + shield_verdict['reason'], tenant_id=tenant_id)
         return jsonify({"success": False, "error": "Suspicious activity detected."}), 403
@@ -1161,7 +1679,7 @@ def init_session():
         log_failure(ip, '/init', 'browser_' + reason, tenant_id=tenant_id)
         return jsonify({"success": False, "error": "Suspicious activity detected."}), 403
 
-    if not check_rate_limit(ip, '/init', 5, 60, tenant_id=tenant_id):
+    if not check_rate_limit(ip, '/init', 20, 60, tenant_id=tenant_id):
         log_failure(ip, '/init', 'rate_limit', tenant_id=tenant_id)
         return jsonify({"success": False, "error": "Too many requests. Try again later."}), 429
 
@@ -1217,17 +1735,18 @@ def get_challenge():
     # bot_shield: bloqueamos bots verificados que desobedecen robots.txt y
     # marcamos clientes sospechosos (impersonadores, scripts genéricos) para
     # recibir el reto PoW a dificultad máxima.
-    shield_verdict = bot_shield.evaluate_request(request.headers.get('User-Agent', ''), ip, request.path)
+    shield_verdict = bot_shield.evaluate_request(request.headers.get('User-Agent', ''), ip, request.path, request.headers.get('X-JA4-Fingerprint') or request.headers.get('X-JA3-Fingerprint'))
     if shield_verdict['action'] == 'block':
         log_failure(ip, '/challenge', 'bot_shield_' + shield_verdict['reason'], tenant_id=tenant_id)
         return jsonify({"success": False, "error": "Suspicious activity detected."}), 403
     # Solo forzamos PoW máximo para sospechosos confirmados por el shield
     # (impersonadores de bots, scripts genéricos). Un navegador normal también
     # recibe 'shield' como 'unverified_client', pero sin hint de dificultad.
+    client_automation = bool((request.get_json(silent=True) or {}).get('automation'))
     shielded = (shield_verdict['action'] == 'shield'
-                and shield_verdict.get('difficulty_hint') == 'max')
+                and shield_verdict.get('difficulty_hint') == 'max') or client_automation
     if shielded:
-        log_failure(ip, '/challenge', 'bot_shield_' + shield_verdict['reason'], tenant_id=tenant_id)
+        log_failure(ip, '/challenge', 'bot_shield_client_automation' if client_automation else 'bot_shield_' + shield_verdict['reason'], tenant_id=tenant_id)
 
     data = request.json or {}
     session_id = data.get('session_id')
@@ -1263,7 +1782,7 @@ def get_challenge():
     update_account_last_seen(tenant_id)
 
     challenge_id = secrets.token_hex(16)
-    salt = secrets.token_hex(8)
+    salt = secrets.token_hex(8) + ':' + get_ip_prefix(ip)
     target = get_difficulty(ip, tenant_id=tenant_id)
     if shielded:
         # Los clientes marcados por bot_shield siempre reciben el PoW más duro.
@@ -1374,7 +1893,8 @@ def redeem():
                 (tenant_id, ip, int(nonce), solve_time, time.time())
             )
             conn.execute("UPDATE sessions SET used = 1 WHERE id = ? AND tenant_id = ?", (session_id, tenant_id))
-        update_account_last_seen(tenant_id)
+            # Dentro de la misma transaccion: evita abrir otra conexion/commit.
+            update_account_last_seen(tenant_id, conn=conn)
         now = int(time.time())
         exp = now + 300
         valid_token = jwt.encode({
@@ -1403,22 +1923,27 @@ def shield_check():
     - allow  -> paso directo
     """
     ip = get_client_ip()
+    ip_key = shield_ip_key()
     ua = request.headers.get('User-Agent', '')
     data = request.get_json(silent=True) or {}
     path = data.get('path') or request.path
 
-    if not check_rate_limit(ip, '/shield/check', 10, 60, tenant_id=SHIELD_TENANT):
+    # Backstop por prefijo (cupo generoso) y límite primario por IP exacta.
+    if not check_rate_limit(ip, '/shield/check', *_parse_rate_limit(RL_SHIELD_CHECK_PREFIX), tenant_id=SHIELD_TENANT):
+        log_failure(ip, '/shield/check', 'rate_limit', tenant_id=SHIELD_TENANT)
+        return jsonify({"success": False, "action": "block", "error": "Too many requests."}), 429
+    if not check_rate_limit(ip, '/shield/check', *_parse_rate_limit(RL_SHIELD_CHECK_PER_IP), tenant_id=SHIELD_TENANT, key=ip_key):
         log_failure(ip, '/shield/check', 'rate_limit', tenant_id=SHIELD_TENANT)
         return jsonify({"success": False, "action": "block", "error": "Too many requests."}), 429
 
-    verdict = bot_shield.evaluate_request(ua, ip, path)
+    verdict = bot_shield.evaluate_request(ua, ip, path, request.headers.get('X-JA4-Fingerprint') or request.headers.get('X-JA3-Fingerprint'))
     if verdict['action'] == 'block':
         log_failure(ip, '/shield/check', 'bot_shield_' + verdict['reason'], tenant_id=SHIELD_TENANT)
         return jsonify({"success": False, "action": "block"}), 403
 
     # `force` (página de verificación humana): emite el PoW aunque el veredicto
     # sea allow, para poder forzar el reto manualmente.
-    force_challenge = bool(data.get('force'))
+    force_challenge = bool(data.get('force')) or bool(data.get('automation'))
 
     if (verdict['action'] == 'shield' and verdict.get('difficulty_hint') == 'max') or force_challenge:
         # Impersonador de bot o script genérico con JS: PoW invisible duro
@@ -1426,7 +1951,7 @@ def shield_check():
         if not force_challenge:
             log_failure(ip, '/shield/check', 'bot_shield_' + verdict['reason'], tenant_id=SHIELD_TENANT)
         challenge_id = secrets.token_hex(16)
-        salt = secrets.token_hex(8)
+        salt = secrets.token_hex(8) + ':' + get_ip_prefix(ip)
         target = _max_difficulty(SHIELD_DIFFICULTY, MIN_DIFFICULTY)
         ch_expires = time.time() + 120
         with get_db() as conn:
@@ -1453,8 +1978,13 @@ def shield_check():
 def shield_redeem():
     """Valida la solución del PoW invisible y emite un clearance token."""
     ip = get_client_ip()
+    ip_key = shield_ip_key()
 
-    if not check_rate_limit(ip, '/shield/redeem', 10, 60, tenant_id=SHIELD_TENANT):
+    # Mismo esquema que /shield/check: backstop por prefijo + límite por IP exacta.
+    if not check_rate_limit(ip, '/shield/redeem', *_parse_rate_limit(RL_SHIELD_REDEEM_PREFIX), tenant_id=SHIELD_TENANT):
+        log_failure(ip, '/shield/redeem', 'rate_limit', tenant_id=SHIELD_TENANT)
+        return jsonify({"success": False, "error": "Too many requests."}), 429
+    if not check_rate_limit(ip, '/shield/redeem', *_parse_rate_limit(RL_SHIELD_REDEEM_PER_IP), tenant_id=SHIELD_TENANT, key=ip_key):
         log_failure(ip, '/shield/redeem', 'rate_limit', tenant_id=SHIELD_TENANT)
         return jsonify({"success": False, "error": "Too many requests."}), 429
 
@@ -1575,11 +2105,11 @@ def verify_token():
                 "INSERT INTO verified_tokens (jti, tenant_id, verified_at, expires) VALUES (?, ?, ?, ?)",
                 (jti, tenant_id, time.time(), payload.get('exp', time.time()))
             )
+            update_account_last_seen(tenant_id, conn=conn)
     except Exception:
         log_failure(ip, '/verify', 'token_reuse', tenant_id=tenant_id)
         return jsonify({"success": True, "valid": False, "error": "token already used"})
 
-    update_account_last_seen(tenant_id)
     return jsonify({"success": True, "valid": True})
 
 
@@ -1605,13 +2135,15 @@ def _create_account_from_request(data):
             "domain": conflict['domain'],
         }), 409
 
-    account_number = generate_account_number()
     now = time.time()
 
     with get_db() as conn:
+        # La PK de account_number resuelve la carrera; generate inserta y el
+        # UPDATE completa la fila en la misma transacción (sin TOCTOU).
+        account_number = generate_account_number(conn, now)
         conn.execute(
-            "INSERT INTO accounts (account_number, tenant_id, domains, primary_domain, created_at, last_seen_at, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (account_number, account_number, domains, primary_domain, now, now, notes)
+            "UPDATE accounts SET tenant_id = ?, domains = ?, primary_domain = ?, created_at = ?, last_seen_at = ?, notes = ? WHERE account_number = ?",
+            (account_number, domains, primary_domain, now, now, notes, account_number)
         )
     _register_domain_for_account(account_number, primary_domain, status='active')
 
@@ -1690,27 +2222,234 @@ def metrics():
             return jsonify({"error": "Admin 2FA setup required", "setup_required": True}), 403
         return jsonify({"error": "Unauthorized"}), 401
     _log_admin_access('/admin/metrics', token_type)
+    try:
+        hours = int(request.args.get('hours', '1'))
+    except (TypeError, ValueError):
+        hours = 1
+    if hours < 0:
+        hours = 0
     with get_db() as conn:
         now = time.time()
         tenant_id = current_tenant()
+        cutoff = (now - hours * 3600) if hours > 0 else 0
+        where = "timestamp > ?" if hours > 0 else "1=1"
+        params = (tenant_id, cutoff) if hours > 0 else (tenant_id,)
         bot_detected = conn.execute(
-            "SELECT COUNT(DISTINCT ip) FROM failed_attempts WHERE tenant_id = ? AND reason IN ('bad_pow', 'bad_signature') AND timestamp > ?",
-            (tenant_id, now - 3600)
+            "SELECT COUNT(DISTINCT ip) FROM failed_attempts WHERE tenant_id = ? AND reason IN ('bad_pow', 'bad_signature') AND " + ("timestamp > ?" if hours > 0 else "1=1"),
+            params
         ).fetchone()[0]
-        total_failures_1h = conn.execute(
-            "SELECT COUNT(*) FROM failed_attempts WHERE tenant_id = ? AND timestamp > ?",
-            (tenant_id, now - 3600)
+        total_failures = conn.execute(
+            "SELECT COUNT(*) FROM failed_attempts WHERE tenant_id = ? AND " + ("timestamp > ?" if hours > 0 else "1=1"),
+            params
         ).fetchone()[0]
-        solves_1h = conn.execute(
-            "SELECT COUNT(*) FROM solved_challenges WHERE tenant_id = ? AND timestamp > ?",
-            (tenant_id, now - 3600)
+        solves = conn.execute(
+            "SELECT COUNT(*) FROM solved_challenges WHERE tenant_id = ? AND " + ("timestamp > ?" if hours > 0 else "1=1"),
+            params
         ).fetchone()[0]
+        bot_detected_all = conn.execute(
+            "SELECT COUNT(DISTINCT ip) FROM failed_attempts WHERE tenant_id = ? AND reason IN ('bad_pow', 'bad_signature')",
+            (tenant_id,)
+        ).fetchone()[0]
+        total_failures_all = conn.execute(
+            "SELECT COUNT(*) FROM failed_attempts WHERE tenant_id = ?",
+            (tenant_id,)
+        ).fetchone()[0]
+        solves_all = conn.execute(
+            "SELECT COUNT(*) FROM solved_challenges WHERE tenant_id = ?",
+            (tenant_id,)
+        ).fetchone()[0]
+        top_ips = [dict(r) for r in conn.execute(
+            "SELECT ip, COUNT(*) AS failures, MAX(timestamp) AS last_seen FROM failed_attempts WHERE tenant_id = ? " + ("AND timestamp > ?" if hours > 0 else "") + " GROUP BY ip ORDER BY failures DESC LIMIT 25",
+            (tenant_id, cutoff) if hours > 0 else (tenant_id,)
+        ).fetchall()]
         return jsonify({
-            "bot_ips_1h": bot_detected,
-            "total_failures_1h": total_failures_1h,
-            "solves_1h": solves_1h,
+            "hours": hours,
+            "bot_ips": bot_detected,
+            "total_failures": total_failures,
+            "solves": solves,
+            "bot_ips_all": bot_detected_all,
+            "total_failures_all": total_failures_all,
+            "solves_all": solves_all,
             "sessions_active": conn.execute("SELECT COUNT(*) FROM sessions WHERE tenant_id = ? AND expires > ?", (tenant_id, now)).fetchone()[0],
+            "top_ips": top_ips,
             "db_size": os.path.getsize(DB_PATH)
+        })
+
+
+def _analytics_grouped(conn, column, where, params, limit=25):
+    """Ejecuta un GROUP BY sobre ``request_log`` y devuelve una lista de dicts."""
+    rows = conn.execute(
+        "SELECT %s AS label, COUNT(*) AS requests, SUM(bytes) AS bytes, "
+        "AVG(duration_ms) AS avg_duration_ms, "
+        "SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) AS errors "
+        "FROM request_log WHERE %s GROUP BY %s ORDER BY requests DESC LIMIT ?" % (column, where, column),
+        params + (limit,)
+    ).fetchall()
+    return [
+        {
+            "label": row["label"],
+            "requests": row["requests"],
+            "bytes": row["bytes"] or 0,
+            "avg_duration_ms": round(row["avg_duration_ms"] or 0, 2),
+            "errors": row["errors"] or 0,
+        }
+        for row in rows
+    ]
+
+
+@app.route('/admin/analytics', methods=['GET'])
+def analytics_data():
+    """Metricas de trafico privacy-first agregadas para el tenant autenticado."""
+    ok, token_type, setup_required = _admin_authorized(readonly=True)
+    if not ok:
+        if setup_required:
+            return jsonify({"error": "Admin 2FA setup required", "setup_required": True}), 403
+        return jsonify({"error": "Unauthorized"}), 401
+    _log_admin_access('/admin/analytics', token_type)
+
+    try:
+        hours = int(request.args.get('hours', '1'))
+    except (TypeError, ValueError):
+        hours = 1
+    if hours < 0:
+        hours = 0
+
+    scope = request.args.get('scope', 'tenant')
+    if scope not in ('tenant', 'shield'):
+        scope = 'tenant'
+
+    bucket = request.args.get('bucket', 'auto')
+    if bucket not in ('auto', 'hour', 'day'):
+        bucket = 'auto'
+    if bucket == 'auto':
+        bucket = 'day' if hours == 0 or hours > 48 else 'hour'
+
+    tenant_id = SHIELD_TENANT if scope == 'shield' else current_tenant()
+
+    with get_db() as conn:
+        now = time.time()
+        cutoff = (now - hours * 3600) if hours > 0 else 0
+        where = "tenant_id = ?" + (" AND timestamp > ?" if hours > 0 else "")
+        params = (tenant_id, cutoff) if hours > 0 else (tenant_id,)
+
+        totals_row = conn.execute(
+            "SELECT COUNT(*) AS requests, COUNT(DISTINCT ip_hash) AS visitors, "
+            "SUM(bytes) AS bytes, AVG(duration_ms) AS avg_duration_ms, "
+            "SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) AS server_errors, "
+            "SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) AS errors, "
+            "SUM(CASE WHEN status < 400 THEN 1 ELSE 0 END) AS successes, "
+            "SUM(CASE WHEN cache_status IN ('HIT','REVALIDATED','STALE') THEN 1 ELSE 0 END) AS cache_hits "
+            "FROM request_log WHERE " + where, params
+        ).fetchone()
+
+        durations = [r[0] for r in conn.execute(
+            "SELECT duration_ms FROM request_log WHERE " + where, params).fetchall() if r[0] is not None]
+        durations.sort()
+        p95 = durations[min(len(durations) - 1, int(len(durations) * 0.95))] if durations else 0
+
+        requests_total = totals_row["requests"] or 0
+        cache_hits = totals_row["cache_hits"] or 0
+        errors_total = totals_row["errors"] or 0
+
+        if bucket == 'hour':
+            bucket_expr = "CAST(timestamp / 3600 AS INTEGER) * 3600"
+        else:
+            bucket_expr = "CAST(strftime('%s', timestamp, 'unixepoch') AS INTEGER) / 86400 * 86400"
+
+        timeline_rows = conn.execute(
+            "SELECT %s AS bucket, COUNT(*) AS requests, SUM(bytes) AS bytes, "
+            "AVG(duration_ms) AS avg_duration_ms, "
+            "SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) AS errors "
+            "FROM request_log WHERE %s GROUP BY bucket ORDER BY bucket" % (bucket_expr, where), params
+        ).fetchall()
+        timeline = [
+            {
+                "bucket": row["bucket"],
+                "label": time.strftime('%Y-%m-%d %H:00' if bucket == 'hour' else '%Y-%m-%d', time.localtime(row["bucket"])),
+                "requests": row["requests"],
+                "bytes": row["bytes"] or 0,
+                "avg_duration_ms": round(row["avg_duration_ms"] or 0, 2),
+                "errors": row["errors"] or 0,
+            }
+            for row in timeline_rows
+        ]
+
+        endpoints = _analytics_grouped(conn, "endpoint", where, params)
+        paths = _analytics_grouped(conn, "path", where, params)
+        statuses = [
+            {"status": r["status"], "count": r["requests"]}
+            for r in conn.execute(
+                "SELECT status, COUNT(*) AS requests FROM request_log WHERE " + where +
+                " GROUP BY status ORDER BY requests DESC", params).fetchall()
+        ]
+        outcomes = _analytics_grouped(conn, "outcome", where, params)
+        cache = _analytics_grouped(conn, "cache_status", where, params)
+        browsers = _analytics_grouped(conn, "browser", where, params)
+        os_list = _analytics_grouped(conn, "os", where, params)
+        devices = _analytics_grouped(conn, "device", where, params)
+        http_versions = _analytics_grouped(conn, "http_version", where, params)
+        hosts = _analytics_grouped(conn, "host", where, params)
+        colos = _analytics_grouped(conn, "colo", where, params)
+
+        geo_rows = conn.execute(
+            "SELECT country, country_code, COUNT(*) AS requests FROM request_log WHERE " + where +
+            " GROUP BY country, country_code ORDER BY requests DESC LIMIT 25", params
+        ).fetchall()
+        geo = [
+            {"country": r["country"], "country_code": r["country_code"], "requests": r["requests"]}
+            for r in geo_rows
+        ]
+
+        ua_rows = conn.execute(
+            "SELECT user_agent, COUNT(*) AS requests FROM request_log WHERE " + where +
+            " GROUP BY user_agent ORDER BY requests DESC LIMIT 25", params
+        ).fetchall()
+        user_agents = [
+            {"user_agent": r["user_agent"] or "Unknown", "requests": r["requests"]}
+            for r in ua_rows
+        ]
+
+        visitor_rows = conn.execute(
+            "SELECT ip_hash, COUNT(*) AS requests FROM request_log WHERE " + where +
+            " GROUP BY ip_hash ORDER BY requests DESC LIMIT 25", params
+        ).fetchall()
+        visitors = [
+            {"label": analytics.pseudonym_label(r["ip_hash"]), "requests": r["requests"]}
+            for r in visitor_rows
+        ]
+
+        return jsonify({
+            "hours": hours,
+            "scope": scope,
+            "bucket": bucket,
+            "tenant_id": tenant_id,
+            "geoip_available": analytics.geoip_available(),
+            "totals": {
+                "requests": requests_total,
+                "visitors": totals_row["visitors"] or 0,
+                "bytes": totals_row["bytes"] or 0,
+                "avg_duration_ms": round(totals_row["avg_duration_ms"] or 0, 2),
+                "p95_duration_ms": round(p95 or 0, 2),
+                "cache_hit_rate": round(cache_hits / requests_total, 4) if requests_total else 0.0,
+                "error_rate": round(errors_total / requests_total, 4) if requests_total else 0.0,
+                "success_rate": round((totals_row["successes"] or 0) / requests_total, 4) if requests_total else 0.0,
+                "server_errors": totals_row["server_errors"] or 0,
+            },
+            "timeline": timeline,
+            "endpoints": endpoints,
+            "paths": paths,
+            "statuses": statuses,
+            "outcomes": outcomes,
+            "cache": cache,
+            "geo": geo,
+            "browsers": browsers,
+            "os": os_list,
+            "devices": devices,
+            "http": http_versions,
+            "hosts": hosts,
+            "colos": colos,
+            "user_agents": user_agents,
+            "visitors": visitors,
         })
 
 
@@ -1790,13 +2529,20 @@ def admin_2fa_status():
 
 @app.route('/admin/2fa/setup', methods=['POST'])
 def admin_2fa_setup():
-    """Genera un nuevo secret TOTP para el admin y devuelve QR. No lo persiste hasta verificar."""
+    """Devuelve el secret TOTP pendiente o genera uno nuevo y lo guarda como pendiente hasta verificar."""
     ok, _, _ = _admin_authorized(readonly=False, skip_totp=True)
     if not ok:
         return jsonify({"error": "Unauthorized"}), 401
     if _get_admin_totp_secret():
         return jsonify({"error": "2FA already configured"}), 400
-    secret = pyotp.random_base32()
+    secret = _get_admin_pending_secret()
+    if not secret:
+        secret = pyotp.random_base32()
+        with get_db() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO admin_2fa (id, secret, created_at, confirmed) VALUES (1, ?, ?, 0)",
+                (secret, time.time())
+            )
     uri = pyotp.totp.TOTP(secret).provisioning_uri(name='admin', issuer_name='Menta')
     qr = _qr_svg(uri)
     return jsonify({"success": True, "secret": secret, "qr": qr, "uri": uri})
@@ -1817,11 +2563,14 @@ def admin_2fa_verify():
     configured = _get_admin_totp_secret()
     if configured and configured != secret:
         return jsonify({"error": "2FA already configured"}), 400
+    pending = _get_admin_pending_secret()
+    if pending and pending != secret:
+        return jsonify({"error": "secret does not match pending setup; call setup again"}), 409
     if pyotp.TOTP(secret).verify(code, valid_window=1):
         codes = _generate_recovery_codes('__admin__')
         with get_db() as conn:
             conn.execute(
-                "INSERT INTO admin_2fa (id, secret, created_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET secret=excluded.secret, created_at=excluded.created_at",
+                "INSERT INTO admin_2fa (id, secret, created_at, confirmed) VALUES (1, ?, ?, 1) ON CONFLICT(id) DO UPDATE SET secret=excluded.secret, created_at=excluded.created_at, confirmed=1",
                 (secret, time.time())
             )
         return jsonify({"success": True, "valid": True, "recovery_codes": codes})
@@ -1837,6 +2586,11 @@ def widget_js():
 @app.route('/menta-shield.js')
 def shield_js():
     return SHIELD_JS, 200, {'Content-Type': 'application/javascript'}
+
+@app.route('/menta-challenge.js')
+def challenge_js():
+    with open(os.path.join(os.path.dirname(__file__), 'menta-challenge.js')) as f:
+        return f.read(), 200, {'Content-Type': 'application/javascript'}
 
 WIDGET_JS = r"""class CapWidget extends HTMLElement {
     constructor() {
@@ -2119,9 +2873,6 @@ SHIELD_JS = r"""(function () {
     function pass(token) {
         window.MentaShield.passed = true;
         window.MentaShield.token = token || null;
-        try {
-            localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: token, ts: Date.now() }));
-        } catch (e) { /* storage no disponible */ }
         removeOverlay();
         document.dispatchEvent(new CustomEvent('mentashield:pass', { detail: { token: token } }));
     }
@@ -2149,15 +2900,6 @@ SHIELD_JS = r"""(function () {
 
     // --- Flujo principal ---
     async function run() {
-        // Clearance reciente: evita re-verificar en cada página/navegación.
-        try {
-            var cached = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null');
-            if (cached && cached.token && Date.now() - cached.ts < TTL) {
-                pass(cached.token);
-                return;
-            }
-        } catch (e) { /* ignore */ }
-
         var verdict;
         try {
             const r = await fetch(api + '/shield/check', {

@@ -215,7 +215,7 @@ class CapWidget extends HTMLElement {
 .container { display:flex; align-items:center; width:var(--cap-width); height:var(--cap-height); background:var(--cap-background); border:var(--cap-border-width) solid var(--cap-border); border-radius:var(--cap-radius); padding:var(--cap-padding); position:relative; box-shadow:var(--cap-shadow); cursor:pointer; user-select:none; box-sizing:border-box; }
 .container:hover { border-color:var(--cap-hover-border); }
 .container:focus-visible { outline:2px solid var(--cap-focus); outline-offset:2px; }
-.checkbox { width:var(--cap-checkbox-size); height:var(--cap-checkbox-size); border:2px solid var(--cap-checkbox-border); border-radius:var(--cap-checkbox-radius); margin-right:15px; display:flex; align-items:center; justify-content:center; background:var(--cap-checkbox-bg); flex-shrink:0; box-sizing:border-box; }
+.checkbox { width:var(--cap-checkbox-size); height:var(--cap-checkbox-size); border:2px solid var(--cap-checkbox-border); border-radius:var(--cap-checkbox-radius); margin-right:8px; display:flex; align-items:center; justify-content:center; background:var(--cap-checkbox-bg); flex-shrink:0; box-sizing:border-box; }
 .container[dir="rtl"] .checkbox { margin-right:0; margin-left:15px; }
 .label { font-size:var(--cap-font-size); color:var(--cap-text); flex-grow:1; font-weight:var(--cap-font-weight); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .brand { position:absolute; right:20px; bottom:var(--cap-brand-bottom); font-size:12px; color:var(--cap-brand); text-decoration:underline; text-underline-offset:3px; }
@@ -292,7 +292,7 @@ ${extra}
             const r = await fetch(ep + '/challenge', {
                 method: 'POST',
                 headers: this.headers,
-                body: JSON.stringify({ session_id: this.sessionId, session_signature: this.sessionSignature })
+                body: JSON.stringify({ session_id: this.sessionId, session_signature: this.sessionSignature, automation: this.detectAutomation() })
             });
             if (!r.ok) {
                 const data = await r.json().catch(() => ({}));
@@ -339,6 +339,18 @@ ${extra}
             this.sessionId = null;
             this.sessionSignature = null;
         }
+    }
+
+    detectAutomation() {
+        try {
+            if (navigator.webdriver === true) return true;
+            if (window._phantom || window.callPhantom || window.__selenium_unwrapped ||
+                window.__webdriver_evaluate || window.__driver_evaluate) return true;
+            if (!navigator.plugins || navigator.plugins.length === 0) return true;
+            if (!navigator.languages || navigator.languages.length === 0) return true;
+            if (navigator.userAgent.indexOf('HeadlessChrome') !== -1) return true;
+        } catch (e) {}
+        return false;
     }
 
     async sha256(m) {
