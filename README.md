@@ -100,9 +100,27 @@ Customize theme, layout, typography, accents, and internationalization via stand
 
 ---
 
+### API Endpoints
+
+Menta exposes several endpoints for CAPTCHA flow and verification:
+
+#### Challenge Flow (Widget mode)
+- **POST /init** — Initialize session, returns signed session_id and session_signature
+- **POST /challenge** — Get a PoW challenge (requires valid session)
+- **POST /redeem** — Submit nonce solution, returns JWT token
+- **POST /verify** — Backend verification of JWT token
+
+#### Universal Protection (Shield mode)
+- **POST /shield/check** — Evaluate request (returns allow/block/shield action)
+- **POST /shield/redeem** — Verify PoW and issue clearance token
+- **POST /shield/verify** — Server-to-server token validation
+
+#### Interstitial Page
+- **GET /verify** or **GET /challenge-page** — Manual PoW challenge page that redirects after completion
+
 ### Backend Token Verification
 
-Verify submitted CAPTCHA tokens directly against your self-hosted backend API or via Python:
+Verify submitted CAPTCHA tokens directly against your self-hosted backend API:
 
 #### HTTP API Call
 
@@ -126,23 +144,48 @@ Content-Type: application/json
 
 ```
 
-#### Python Integration
+---
 
-```python
-from mentacaptcha import MentaCaptcha
+### Traffic Analytics & Privacy
 
-captcha = MentaCaptcha()
+The self-hosted backend can record aggregate traffic analytics for the dashboard without storing raw IP addresses.
 
-# Verify token from frontend request
-is_valid = captcha.verify(challenge_id, user_response)
+* Raw client IPs are used only in memory to derive a truncated HMAC-SHA-256 (`ip_hash`). The IP and its prefix are never persisted.
+* Visitors are displayed as anonymous labels (`anon-<hash prefix>`), never as addresses.
+* Referrers are reduced to origin/host, dropping query strings that may contain sensitive data.
+* GeoIP lookups are optional and only resolve a country from the in-memory IP.
 
-```
+Configure it with environment variables in your `.env`:
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `ANALYTICS_ENABLED` | Enable request logging for analytics | `true` |
+| `ANALYTICS_IP_SALT` | Secret used to HMAC client IPs (falls back to `SECRET_KEY`) | `SECRET_KEY` |
+| `ANALYTICS_RETENTION_HOURS` | How long analytics rows are kept | `DATA_RETENTION_HOURS` (`24`) |
+| `ANALYTICS_LOG_SAMPLE_RATE` | Fraction of requests logged (`0.0`–`1.0`) | `1.0` |
+| `GEOIP_DB_PATH` | Path to a MaxMind `GeoLite2-City.mmdb` file | unset (`Unknown`) |
+| `TRUSTED_PROXIES` | Comma-separated proxy IPs/CIDRs allowed to set client headers | unset |
+| `CORS_ORIGINS` | Comma-separated list of allowed origins for widget requests | empty (permissive) |
+| `LOG_IP_FULL` | Store full IPs instead of anonymized /24 (IPv4) or /64 (IPv6) prefixes | `false` |
+
+**Privacy & IP Anonymization:**
+- By default, only IP network prefixes are logged (`/24` for IPv4, `/64` for IPv6) to minimize personal data
+- All client IPs are pseudonymized using HMAC-SHA-256 in analytics; raw IPs are never persisted
+- Set `LOG_IP_FULL=true` only if you need full IP addresses for debugging (not recommended in production)
+
+GeoIP support requires the optional `geoip2` package (included in `requirements.txt`) and a local MaxMind database. Without either, the dashboard reports `Unknown` for geography; every other metric still works.
+
+Analytics views are available in the admin dashboard (`/admin/analytics`) and require an authenticated admin session with 2FA enabled. Results are always scoped to the requesting tenant.
 
 ---
 
 ### Key Features
 
-* **100% Privacy-First:** Zero external requests, zero third-party tracking, fully GDPR compliant out of the box.
+* **100% Privacy-First:** Zero external requests, zero third-party tracking, fully GDPR compliant out of the box. IP anonymization by default.
 * **No Visual Puzzles:** Protects forms without frustrating your human users with traffic lights and crosswalks.
-* **Lightweight & Fast:** Sub-millisecond validation time with zero database setup required.
+* **Lightweight & Fast:** Sub-millisecond validation time with zero database setup required. Proof-of-work challenges solved in 1-3 seconds client-side.
+* **Self-Hosted:** Own your bot defense end-to-end. No per-request bills, no quotas, no vendor lock-in.
+* **Bot Detection:** Detects and blocks known AI crawlers (OpenAI, Anthropic, Perplexity, etc.) using IP verification and reverse-DNS confirmation.
+* **Rate Limiting:** Per-IP, per-tenant, and global rate limits prevent automated attacks.
+* **Single-Use Tokens:** JWT tokens with consumed jti (unique identifier) prevent replay attacks.
 * **Apache 2.0 Licensed:** Free for commercial and open-source projects without AGPL constraints.
