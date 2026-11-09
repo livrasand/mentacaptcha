@@ -25,6 +25,12 @@
   }
   .challenge-error { color: var(--color-error); font-weight: var(--font-weight-bold); }
   .challenge-ok { color: var(--color-primary); font-weight: var(--font-weight-bold); }
+  .blocked-state { text-align: center; padding: var(--padding-12x) 0; }
+  .blocked-icon { font-size: 4rem; margin: 0 0 var(--padding-6x); opacity: 0.6; }
+  .blocked-title { font-size: var(--font-size-h1); font-weight: var(--font-weight-bold); margin: 0 0 var(--padding-4x); color: var(--color-error); }
+  .blocked-message { font-size: 1.1rem; color: var(--value-color); margin: 0 0 var(--padding-8x); max-width: 460px; line-height: 1.6; }
+  .blocked-btn { display: inline-flex; background: var(--color-error); color: var(--color-error-contrast); border: 2px solid var(--color-error-contrast); padding: var(--padding) var(--padding-4x); border-radius: var(--border-radius); font-weight: var(--font-weight-bold); box-shadow: 4px 4px var(--color-error-contrast); text-decoration: none; }
+  .blocked-btn:hover { background: var(--color-error-shade); border-color: var(--color-error-shade); }
 </style>
 </head>
 <body>
@@ -46,7 +52,7 @@
 
     <div style="margin-bottom: var(--padding-4x);"><button id="retry" class="button" type="button" style="display: none;">Try again</button></div>
 
-    <p style="color: var(--value-color); font-size: var(--font-size-small); margin: 0 auto; max-width: 460px;">Performance test by <a href="https://github.com/livrasand/mentacaptcha" target="_blank" rel="noopener">Menta</a> &middot; privacy-first CAPTCHA</p>
+    <p style="color: var(--value-color); font-size: var(--font-size-small); margin: 0 auto; max-width: 460px;">Protected by <a href="https://github.com/livrasand/mentacaptcha" target="_blank" rel="noopener">Menta</a> From <a href="https://github.com/livrasand" target="_blank" rel="noopener">livrasand</a>. Made with ☕ in 🇲🇽.</p>
 
   </div>
 </div>
@@ -133,9 +139,15 @@
     }
   }
 
-  function progressLabel (hashes, seconds) {
-    var count = new Intl.NumberFormat('en-US').format(Math.max(0, Math.floor(hashes)))
-    return count + ' hashes in ' + seconds.toFixed(1) + ' s …'
+  function fmtSpeed (hps) {
+    if (!isFinite(hps) || hps <= 0) return '—'
+    if (hps >= 1e6) return (hps / 1e6).toFixed(3) + 'MH/s'
+    if (hps >= 1e3) return (hps / 1e3).toFixed(3) + 'kH/s'
+    return Math.max(1, Math.round(hps)) + 'H/s'
+  }
+
+  function powStat (difficulty, hashes, seconds) {
+    return 'Difficulty: ' + difficulty + ', Speed: ' + fmtSpeed(seconds > 0 ? hashes / seconds : 0)
   }
 
   function solve (challenge, solveCtx) {
@@ -151,7 +163,7 @@
     // quemar CPU de un bot conocido. Extendemos el timeout a 24 h.
     var TIMEOUT_MS = target.length >= 12 ? 24 * 60 * 60 * 1000 : 110000
 
-    setMeta('Difficulty: ' + difficulty + ' leading zeros.')
+    setMeta(powStat(difficulty, 0, 0))
 
     function step () {
       if (Date.now() - t0 > TIMEOUT_MS) {
@@ -174,7 +186,7 @@
         }
         nonce++
         if ((hashes & 1023) === 0) {
-          setMeta(progressLabel(hashes, (Date.now() - t0) / 1000))
+          setMeta(powStat(difficulty, hashes, (Date.now() - t0) / 1000))
         }
         return step()
       })
@@ -202,13 +214,23 @@
       var data = r1.data || {}
       if (data.action === 'block') {
         showSpinner(false)
-        setHeading('Access denied')
-        setStatus('Sorry, you are blocked from accessing this resource.', 'error')
-        setMeta('')
         showRetry(false)
+        document.querySelector('.card-container').style.display = 'none'
+        var blockedHtml = '<div class="blocked-state"><div class="blocked-icon">🚫</div><h1 class="blocked-title">Access denied</h1><p class="blocked-message">Sorry, you are blocked from accessing this resource.</p></div>'
+        document.querySelector('.container').insertAdjacentHTML('beforeend', blockedHtml)
         return
       }
       if (data.action === 'shield' && data.challenge) {
+        // Detect impossible challenge (tarpit/blocked IP) - target with 12+ hex zeros
+        var target = data.challenge.target || ''
+        if (target.length >= 12 && /^0+$/.test(target)) {
+          showSpinner(false)
+          showRetry(false)
+          document.querySelector('.card-container').style.display = 'none'
+          var blockedHtml = '<div class="blocked-state"><div class="blocked-icon">🚫</div><h1 class="blocked-title">Access denied</h1><p class="blocked-message">Sorry, you are blocked from accessing this resource.</p></div>'
+          document.querySelector('.container').insertAdjacentHTML('beforeend', blockedHtml)
+          return
+        }
         setStatus('Solving a challenge in your browser…', '')
         var ctx = {}
         return solve(data.challenge, ctx).then(function (nonce) {
@@ -219,7 +241,7 @@
           }).then(function (r2) {
             if (r2.data && r2.data.success && r2.data.clearance_token) {
               if (metaEl) {
-                metaEl.textContent = 'Proof completed in ' + ctx.elapsed.toFixed(2) + ' s (' + new Intl.NumberFormat('en-US').format(ctx.hashes) + ' hashes).'
+                metaEl.textContent = 'Proof completed in ' + ctx.elapsed.toFixed(2) + ' s — Speed: ' + fmtSpeed(ctx.hashes / ctx.elapsed) + '.'
               }
               setHeading('Verification complete')
               setStatus('Success! Redirecting…', 'ok')

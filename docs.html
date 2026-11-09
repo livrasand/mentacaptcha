@@ -258,11 +258,27 @@ Response:
   <p style="margin-bottom: var(--padding-4x);">Protect any page without a widget or domain registration:</p>
   <pre style="background: var(--color-body); padding: var(--padding-4x); border-radius: var(--border-radius); overflow-x: auto; margin-bottom: var(--padding-4x);"><code>&lt;script src="https://your-domain.com/menta-challenge.js" data-menta-api="https://your-domain.com" data-menta-next="/protected"&gt;&lt;/script&gt;</code></pre>
   <ul style="padding-left: var(--padding-6x); margin-bottom: var(--padding-4x);">
-    <li style="margin-bottom: var(--padding-2x);"><code>data-menta-api</code> — Menta instance URL (defaults to current origin)</li>
+    <li style="margin-bottom: var(--padding-2x);"><code>data-menta-api</code> — Menta instance URL (required; all check/redeem calls go to your Menta server, not the host site)</li>
     <li style="margin-bottom: var(--padding-2x);"><code>data-menta-next</code> — redirect target after success (defaults to current path)</li>
     <li style="margin-bottom: var(--padding-2x);"><code>data-menta-i18n-checking</code> — custom checking message</li>
+    <li style="margin-bottom: var(--padding-2x);"><code>data-menta-i18n-blocked-title</code> — title shown when access is denied</li>
+    <li style="margin-bottom: var(--padding-2x);"><code>data-menta-i18n-blocked-detail</code> — detail shown when access is denied</li>
   </ul>
   <p style="color: var(--value-color);">Or link directly to the interstitial page: <code style="display: inline; padding: 2px 8px;">/challenge-page?next=/protected</code></p>
+</div>
+
+<div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">
+  <h2 style="margin-bottom: var(--padding-4x);">Embeddable challenge widget</h2>
+  <p style="margin-bottom: var(--padding-4x);">Drop the challenge overlay on any page. All data is sent to and processed by your Menta server (<code>data-menta-api</code>), never the host site:</p>
+  <pre style="background: var(--color-body); padding: var(--padding-4x); border-radius: var(--border-radius); overflow-x: auto; margin-bottom: var(--padding-4x);"><code>&lt;script src="https://tu-dominio-menta.com/menta-challenge.js" data-menta-api="https://tu-dominio-menta.com" data-menta-next="/protected"&gt;&lt;/script&gt;</code></pre>
+  <ul style="padding-left: var(--padding-6x); margin-bottom: var(--padding-4x);">
+    <li style="margin-bottom: var(--padding-2x);"><code>data-menta-api</code> — URL de tu instancia Menta (obligatorio; el widget consulta <code>/shield/check</code> y <code>/shield/redeem</code> en ese servidor)</li>
+    <li style="margin-bottom: var(--padding-2x);"><code>data-menta-next</code> — destino del redireccionamiento tras el éxito (por defecto, la ruta actual)</li>
+    <li style="margin-bottom: var(--padding-2x);"><code>data-menta-i18n-checking</code> — mensaje mientras se resuelve la prueba de trabajo</li>
+    <li style="margin-bottom: var(--padding-2x);"><code>data-menta-i18n-blocked-title</code> — título cuando el acceso es denegado</li>
+    <li style="margin-bottom: var(--padding-2x);"><code>data-menta-i18n-blocked-detail</code> — detalle cuando el acceso es denegado</li>
+  </ul>
+  <p style="color: var(--value-color);">Ejemplo: en <code>gitgost.livrasand.com</code> incrustas el widget, pero el desafío y los datos los procesa tu servidor de Menta, no <code>gitgost.livrasand.com</code>.</p>
 </div>
 
 <div class="card-container" style="margin-bottom: var(--padding-8x); padding: var(--padding-6x);">

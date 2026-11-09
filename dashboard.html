@@ -90,6 +90,57 @@
   .dash-panel { display: none; }
   .dash-panel.is-active { display: block; }
 
+  .bl-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--padding-1x);
+    margin-bottom: var(--padding-2x);
+  }
+  .bl-form input { margin: 0; }
+  .bl-form input#bl-ip { flex: 1 1 16rem; min-width: 12rem; }
+  .bl-form input#bl-hours { width: 5rem; }
+  .bl-form input#bl-reason { flex: 1 1 10rem; min-width: 8rem; }
+  .bl-unblock { padding: 0 var(--padding-1x); margin: 0; }
+
+  /* ---- Modal (add account) ---- */
+  .ac-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding: clamp(1rem, 8vh, 6rem) var(--padding-3x) var(--padding-6x);
+    overflow-y: auto;
+    z-index: 50;
+  }
+  .ac-overlay.is-open { display: flex; }
+  .ac-modal {
+    background: var(--color-card);
+    border: 1px solid var(--color-card-contrast);
+    border-radius: var(--border-radius);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    width: min(36rem, 100%);
+    padding: var(--padding-6x);
+  }
+  .ac-modal h3 { margin: 0 0 var(--padding-2x); }
+  .ac-modal label { display: block; font-size: var(--font-size-small); margin: var(--padding-2x) 0 var(--padding-0_5x); }
+  .ac-modal input { width: 100%; }
+  .ac-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--padding-2x);
+    margin-top: var(--padding-4x);
+  }
+  .ac-error {
+    display: none;
+    margin-top: var(--padding-2x);
+    color: var(--color-error);
+    font-size: var(--font-size-small);
+  }
+  .ac-result[hidden] { display: none; }
+  .ac-result strong { display: inline-block; margin-bottom: var(--padding-0_5x); }
+
   .dash-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
@@ -281,6 +332,7 @@
       <button type="button" class="dash-tab" role="tab" data-tab="accounts" aria-selected="false">Accounts</button>
       <button type="button" class="dash-tab" role="tab" data-tab="requests" aria-selected="false">Data requests</button>
       <button type="button" class="dash-tab" role="tab" data-tab="log" aria-selected="false">Admin log</button>
+      <button type="button" class="dash-tab" role="tab" data-tab="blocked" aria-selected="false">Blocked IPs</button>
     </div>
 
     <!-- Analytics -->
@@ -289,6 +341,7 @@
         <h2>Traffic analytics</h2>
         <div class="actions">
           <select id="an-scope" aria-label="Scope">
+            <option value="all">All tenants</option>
             <option value="tenant">Tenant</option>
             <option value="shield">Shield</option>
           </select>
@@ -422,10 +475,11 @@
         <table id="tbl-ips">
           <thead>
             <tr>
-              <th style="width: 30%;">IP</th>
-              <th style="width: 25%;">Location</th>
-              <th style="width: 20%;">Failures</th>
-              <th style="width: 25%;">Last seen</th>
+              <th style="width: 26%;">IP</th>
+              <th style="width: 22%;">Location</th>
+              <th style="width: 16%;">Failures</th>
+              <th style="width: 22%;">Last seen</th>
+              <th style="width: 14%;">Action</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -438,12 +492,13 @@
       <div class="dash-toolbar">
         <h2>Accounts</h2>
         <div class="actions">
+          <button type="button" class="dash-tab" id="ac-open">Add account</button>
           <button type="button" class="dash-tab" id="refresh-accounts">Refresh</button>
         </div>
       </div>
       <div class="card-container">
         <div class="content">
-          <p class="dash-note">Create accounts with <code>POST /admin/account</code> (admin token). Every account owns its own domains, sessions and traffic.</p>
+          <p class="dash-note">Create an account for each site using your widget. The account number is the <code>tenant_id</code> your widget uses.</p>
           <div class="table-container" style="overflow: auto; max-height: 32rem;">
             <table id="tbl-accounts">
               <thead>
@@ -458,6 +513,40 @@
               </thead>
               <tbody></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add account modal -->
+      <div class="ac-overlay" id="ac-overlay">
+        <div class="ac-modal" role="dialog" aria-modal="true" aria-labelledby="ac-title">
+          <form id="ac-form" autocomplete="off">
+            <h3 id="ac-title">Add account</h3>
+            <label for="ac-domain">Primary domain</label>
+            <input id="ac-domain" placeholder="e.g. gitgost.livrasand.com" value="gitgost.livrasand.com" required>
+            <label for="ac-domains">Extra domains (optional, comma-separated)</label>
+            <input id="ac-domains" placeholder="example.org, www.example.net">
+            <label for="ac-number">Custom account number (optional)</label>
+            <input id="ac-number" placeholder="4-16 digits; leave empty for auto" inputmode="numeric" pattern="[0-9]{4,16}">
+            <label for="ac-notes">Notes (optional)</label>
+            <input id="ac-notes" placeholder="e.g. prod widget" maxlength="256">
+            <div class="ac-error" id="ac-error" role="alert"></div>
+            <div class="ac-actions">
+              <button type="button" id="ac-cancel">Cancel</button>
+              <button type="submit" class="dash-tab">Create account</button>
+            </div>
+          </form>
+          <div class="ac-result" id="ac-result" hidden>
+            <h3>Account created</h3>
+            <p class="ac-warn" style="color: var(--color-error); font-size: var(--font-size-small);">This number will <strong>not</strong> be shown again. Copy it now.</p>
+            <div style="display: flex; gap: var(--padding-2x); align-items: center; flex-wrap: wrap;">
+              <code id="ac-number-out" style="font-size: 1.15rem; word-break: break-all;"></code>
+            </div>
+            <p style="color: var(--value-color); margin-top: var(--padding-2x);">Use it as <code>tenant_id</code> for the widget.</p>
+            <div class="ac-actions">
+              <button type="button" id="ac-copy" class="dash-tab">Copy account number</button>
+              <button type="button" id="ac-done">Done</button>
+            </div>
           </div>
         </div>
       </div>
@@ -500,6 +589,38 @@
               <th style="width: 12%;">Token</th>
               <th style="width: 20%;">IP</th>
               <th style="width: 20%;">Location</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Blocked IPs (pseudonimizados por HMAC; nunca se guarda la IP) -->
+    <section id="panel-blocked" class="dash-panel" role="tabpanel">
+      <div class="dash-toolbar">
+        <h2>Blocked IPs</h2>
+        <div class="actions">
+          <button type="button" class="dash-tab" id="refresh-blocked">Refresh</button>
+        </div>
+      </div>
+      <form class="bl-form" id="bl-form" autocomplete="off">
+        <input id="bl-ip" placeholder="203.0.113.45, 203.0.113.0/24 or anon-hash/ip_hash" required />
+        <input id="bl-hours" type="number" min="0" step="1" value="24" title="Hours (0 = permanent)" />
+        <input id="bl-reason" placeholder="Reason (optional)" maxlength="256" />
+        <button type="submit" class="dash-tab">Block</button>
+      </form>
+      <div class="table-container" style="overflow: auto; max-height: 32rem;">
+        <table id="tbl-blocked">
+          <thead>
+            <tr>
+              <th style="width: 16%;">Identifier</th>
+              <th style="width: 8%;">Scope</th>
+              <th style="width: 22%;">Reason</th>
+              <th style="width: 12%;">Blocked</th>
+              <th style="width: 12%;">Expires</th>
+              <th style="width: 20%;">Blocked by</th>
+              <th style="width: 10%;">Action</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -683,7 +804,7 @@
     if (!rows.length) {
       var tr = document.createElement('tr');
       var td = document.createElement('td');
-      td.colSpan = 4;
+      td.colSpan = 5;
       td.className = 'dash-empty';
       td.textContent = 'No failures recorded for this period.';
       tr.appendChild(td);
@@ -708,6 +829,19 @@
       tr.appendChild(textNode('td', loc || '—'));
       tr.appendChild(textNode('td', formatNumber(row.failures)));
       tr.appendChild(textNode('td', formatTimestamp(row.last_seen)));
+      var tdAct = document.createElement('td');
+      if (row.ip) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'dash-tab bl-unblock';
+        btn.textContent = 'Block';
+        btn.title = 'Block this IP/subnet (hashed, never stored in clear)';
+        btn.addEventListener('click', function () {
+          blockTarget(row.ip, 24, 'Top IP (failures)');
+        });
+        tdAct.appendChild(btn);
+      }
+      tr.appendChild(tdAct);
       tbody.appendChild(tr);
     });
 
@@ -765,6 +899,140 @@
     renderBars('an-colos', (d.colos || []).map(function (r) { return { label: r.label, value: r.requests }; }));
     renderBars('an-top-visitors', (d.visitors || []).map(function (r) { return { label: r.label, value: r.requests }; }));
     renderBars('an-ua', (d.user_agents || []).map(function (r) { return { label: r.user_agent, value: r.requests }; }));
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Blocked IPs (HMAC pseudonyms; raw IPs never stored)
+   * ------------------------------------------------------------------ */
+
+  function normalizeBlockValue(value) {
+    var v = (value || '').trim();
+    if (!v) return null;
+    // Pseudonimo de la analitica ("hmac:<hex32>") => bloqueo por ip_hash exacto
+    if (v.toLowerCase().indexOf('hmac:') === 0) {
+      v = v.slice(5).trim();
+      if (!/^[0-9a-f]{16,64}$/i.test(v)) return null;
+      return { ip_hash: v.toLowerCase(), kind: 'ip' };
+    }
+    // Prefijo explicito (x.x.x.x/24) => la IP cruda se hashea en el servidor
+    if (v.indexOf('/') !== -1) return { ip: v };
+    // Hex simple (pseudonimo pegado a mano) => ip_hash
+    if (/^[0-9a-f]{16,64}$/i.test(v)) return { ip_hash: v.toLowerCase(), kind: 'ip' };
+    return { ip: v };
+  }
+
+  function blockTarget(value, hours, reason) {
+    var target = normalizeBlockValue(value);
+    if (!target) {
+      showError('Invalid IP, subnet or pseudonym.');
+      return;
+    }
+    var body = { hours: Number(hours) || 0, reason: reason || '' };
+    if (target.ip_hash) { body.ip_hash = target.ip_hash; body.kind = target.kind; }
+    else body.ip = target.ip;
+    fetch('/admin/blocked', {
+      method: 'POST',
+      headers: adminHeaders(true),
+      body: JSON.stringify(body)
+    })
+      .then(function (resp) {
+        return resp.json().then(function (data) {
+          if (!resp.ok) handleAdminError(resp, data);
+          return data;
+        });
+      })
+      .then(function (data) {
+        loadBlocked();
+        loadMetrics(true);
+      })
+      .catch(function (e) { showError(e.message || 'Block failed'); });
+  }
+
+  function unblockTarget(ipHash) {
+    fetch('/admin/blocked', {
+      method: 'DELETE',
+      headers: adminHeaders(true),
+      body: JSON.stringify({ ip_hash: ipHash })
+    })
+      .then(function (resp) {
+        return resp.json().then(function (data) {
+          if (!resp.ok) handleAdminError(resp, data);
+          return data;
+        });
+      })
+      .then(function () { loadBlocked(); })
+      .catch(function (e) { showError(e.message || 'Unblock failed'); });
+  }
+
+  function loadBlocked() {
+    fetch('/admin/blocked?limit=500', { headers: adminHeaders(false) })
+      .then(function (resp) {
+        return resp.json().then(function (data) {
+          if (!resp.ok) handleAdminError(resp, data);
+          return data;
+        });
+      })
+      .then(function (data) { renderBlocked(data.blocked || []); })
+      .catch(function (e) {
+        renderBlocked(null);
+        showError(e.message || 'Could not load blocked IPs');
+      });
+  }
+
+  function renderBlocked(items) {
+    var tbody = el('tbl-blocked').querySelector('tbody');
+    clear(tbody);
+
+    if (!items || !items.length) {
+      var tr = document.createElement('tr');
+      var td = document.createElement('td');
+      td.colSpan = 7;
+      td.className = 'dash-empty';
+      td.textContent = 'No blocked IPs. Block one above or from the Top IPs table.';
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+      return;
+    }
+
+    items.forEach(function (row) {
+      var tr = document.createElement('tr');
+
+      var tdId = document.createElement('td');
+      var span = document.createElement('span');
+      span.textContent = row.label || row.ip_hash || '';
+      span.setAttribute('data-identifier', row.ip_hash || '');
+      span.setAttribute('data-what', 'IP');
+      span.setAttribute('data-shorten', 'false');
+      span.title = row.ip_hash || '';
+      tdId.appendChild(span);
+      tr.appendChild(tdId);
+
+      var kindLabel = row.kind === 'prefix' ? 'Subnet' : 'IP';
+      if (row.active === false) kindLabel += ' (stale key)';
+      tr.appendChild(textNode('td', kindLabel));
+
+      tr.appendChild(textNode('td', row.reason || '—'));
+      tr.appendChild(textNode('td', formatTimestamp(row.blocked_at)));
+
+      var expiresTxt;
+      if (row.permanent) expiresTxt = 'Permanent';
+      else if (row.expires_at) expiresTxt = formatTimestamp(row.expires_at);
+      else expiresTxt = '—';
+      tr.appendChild(textNode('td', expiresTxt));
+
+      tr.appendChild(textNode('td', row.blocked_by || '—'));
+
+      var tdAct = document.createElement('td');
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'dash-tab bl-unblock';
+      btn.textContent = 'Unblock';
+      btn.addEventListener('click', function () { unblockTarget(row.ip_hash); });
+      tdAct.appendChild(btn);
+      tr.appendChild(tdAct);
+
+      tbody.appendChild(tr);
+    });
   }
 
   function statusColor(status) {
@@ -929,7 +1197,7 @@
         var accounts = res.data.accounts || [];
 
         if (!accounts.length) {
-          tbody.appendChild(rowMessage(6, 'No accounts yet. Create one with POST /admin/account.'));
+          tbody.appendChild(rowMessage(6, 'No accounts yet. Use "Add account" above to create one for your widget.'));
           return;
         }
 
@@ -1002,6 +1270,61 @@
         loadAccounts();
       })
       .catch(function (e) { window.alert(e.message); });
+  }
+
+  function acModalOpen() {
+    el('ac-overlay').classList.add('is-open');
+    el('ac-form').hidden = false;
+    el('ac-result').hidden = true;
+    el('ac-error').style.display = 'none';
+    var d = el('ac-domain');
+    d.value = 'gitgost.livrasand.com';
+    el('ac-domains').value = '';
+    el('ac-number').value = '';
+    el('ac-notes').value = '';
+    d.focus();
+  }
+
+  function acModalClose() {
+    el('ac-overlay').classList.remove('is-open');
+  }
+
+  function acShowError(msg) {
+    var box = el('ac-error');
+    box.textContent = msg;
+    box.style.display = 'block';
+  }
+
+  function createAccount(primaryDomain, extraDomains, customNumber, notes) {
+    var body = { primary_domain: primaryDomain };
+    if (extraDomains) body.domains = extraDomains;
+    if (customNumber) body.account_number = customNumber;
+    if (notes) body.notes = notes;
+
+    fetch('/admin/account', {
+      method: 'POST', headers: adminHeaders(true), credentials: 'same-origin',
+      body: JSON.stringify(body)
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
+      .then(function (res) {
+        if (!res.ok) handleAdminError(res.status, res.data);
+        el('ac-form').hidden = true;
+        el('ac-result').hidden = false;
+        el('ac-number-out').textContent = res.data.account_number || '';
+        loadAccounts();
+      })
+      .catch(function (e) { acShowError(e.message || 'Could not create account.'); });
+  }
+
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+    document.body.removeChild(ta);
   }
 
   /* ------------------------------------------------------------------ *
@@ -1162,6 +1485,7 @@
     if (name === 'accounts') loadAccounts();
     if (name === 'log') loadAdminLog();
     if (name === 'analytics') loadAnalytics();
+    if (name === 'blocked') loadBlocked();
   }
 
   function setHours(hours) {
@@ -1231,7 +1555,54 @@
     el('refresh-all').addEventListener('click', refreshAll);
     el('refresh-analytics').addEventListener('click', function () { loadAnalytics(); });
     el('refresh-accounts').addEventListener('click', loadAccounts);
+    el('ac-open').addEventListener('click', acModalOpen);
+    el('ac-cancel').addEventListener('click', acModalClose);
+    el('ac-done').addEventListener('click', acModalClose);
+    el('ac-overlay').addEventListener('click', function (e) {
+      if (e.target === el('ac-overlay') && el('ac-result').hidden) acModalClose();
+    });
+    el('ac-copy').addEventListener('click', function () {
+      var num = el('ac-number-out').textContent;
+      var btn = el('ac-copy');
+      var done = function () {
+        btn.textContent = 'Copied';
+        setTimeout(function () { btn.textContent = 'Copy account number'; }, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(num).then(done, function () { fallbackCopy(num); done(); });
+      } else {
+        fallbackCopy(num); done();
+      }
+    });
+    el('ac-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      el('ac-error').style.display = 'none';
+      var numVal = el('ac-number').value.trim();
+      if (numVal && !/^[0-9]{4,16}$/.test(numVal)) {
+        acShowError('Custom account number must be 4-16 digits.');
+        return;
+      }
+      createAccount(
+        el('ac-domain').value.trim(),
+        el('ac-domains').value.trim(),
+        numVal,
+        el('ac-notes').value.trim()
+      );
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && el('ac-overlay').classList.contains('is-open') && el('ac-result').hidden) {
+        acModalClose();
+      }
+    });
     el('refresh-log').addEventListener('click', loadAdminLog);
+    el('refresh-blocked').addEventListener('click', loadBlocked);
+    el('bl-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      hideError();
+      var hoursVal = parseInt(el('bl-hours').value, 10);
+      if (isNaN(hoursVal) || hoursVal < 0) hoursVal = 0;
+      blockTarget(el('bl-ip').value, hoursVal, el('bl-reason').value);
+    });
     el('an-scope').addEventListener('change', function () { loadAnalytics(); });
     el('an-bucket').addEventListener('change', function () { loadAnalytics(); });
     el('export').addEventListener('click', function () { loadData('export-data'); });

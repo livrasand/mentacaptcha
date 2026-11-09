@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import ipaddress
 import io
+import re
 import threading
 import analytics
 import bot_shield
@@ -34,7 +35,8 @@ import pyotp
 import qrcode
 import qrcode.image.svg
 from datetime import timedelta
-from flask import Flask, request, jsonify, render_template_string, render_template, send_file, send_from_directory, g, session
+from flask import Flask, request, jsonify, redirect, render_template_string, render_template, send_file, send_from_directory, g, session
+from urllib.parse import quote
 app = Flask(__name__, template_folder='.')
 
 
@@ -556,10 +558,140 @@ def _migrate():
             )
         """)
         conn.execute("""CREATE INDEX IF NOT EXISTS idx_totp_recovery ON totp_recovery_codes(owner, used)""")
+        # Bloqueo de IPs por pseudonimo HMAC (la IP cruda nunca se guarda).
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS blocked_ips (
+                ip_hash TEXT PRIMARY KEY,
+                kind TEXT NOT NULL DEFAULT 'ip',
+                key_fp TEXT NOT NULL DEFAULT '',
+                reason TEXT NOT NULL DEFAULT '',
+                blocked_by TEXT NOT NULL DEFAULT '',
+                blocked_at REAL NOT NULL,
+                expires_at REAL NOT NULL DEFAULT 0,
+                hits INTEGER NOT NULL DEFAULT 0,
+                last_seen_at REAL NOT NULL DEFAULT 0
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_blocked_exp ON blocked_ips(expires_at)")
+        cols_blocked = {r[1] for r in conn.execute("PRAGMA table_info(blocked_ips)").fetchall()}
+        if "kind" not in cols_blocked:
+            conn.execute("ALTER TABLE blocked_ips ADD COLUMN kind TEXT NOT NULL DEFAULT 'ip'")
         cols_2fa = {r[1] for r in conn.execute("PRAGMA table_info(admin_2fa)").fetchall()}
         if "confirmed" not in cols_2fa:
             conn.execute("ALTER TABLE admin_2fa ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 1")
 _migrate()
+
+# --- Bloqueo de IPs por pseudonimo HMAC (pepper separada de la BD) -----------
+# El identificador guardado es HMAC-SHA256(pepper, IP) truncado a 128 bits,
+# el MISMO pseudonimo que la analitica (analytics.pseudonymize_ip), asi que
+# un bloqueo y una entrada de request_log coinciden para la misma IP.
+# La pepper vive fuera de la base de datos (env ANALYTICS_IP_SALT o SECRET_KEY):
+# con ella un atacante con la BD podria reconstruir IPs por fuerza bruta del
+# espacio IPv4. ``key_fp`` permite clave-por-version: al rotar la pepper los
+# pseudonimos viejos dejan de verificar; los bloqueos activos pueden re-crear.
+
+_BLOCKED_CACHE_TTL = float(os.environ.get('BLOCKED_CACHE_TTL', '60'))
+_blocked_cache = (0.0, {})  # (loaded_at, {kind + ':' + key_fp + ':' + ip_hash: expires_at})
+
+
+def _ip_block_key_fp():
+    """Huella de la pepper vigente (para versionar bloqueos ante rotacion)."""
+    try:
+        salt = analytics.get_salt()
+    except RuntimeError:
+        return ''
+    return hashlib.sha256(salt.encode('utf-8')).hexdigest()[:8]
+
+
+def _ip_block_hash(raw_or_prefix):
+    """Pseudonimo HMAC del bloqueo: identico al de la analitica.
+
+    Acepta una IP exacta ('203.0.113.45') o un prefijo ('203.0.113.0/24');
+    cualquiera de los dos produce su identidad HMAC determinista.
+    """
+    return analytics.pseudonymize_ip(raw_or_prefix)
+
+
+def _resolve_block_target(value, kind):
+    """Normaliza (kind, valor-hash) para IP exacta o prefijo de red."""
+    value = (value or '').strip()
+    if not value:
+        return None, None
+    if '/' in value:
+        # Prefijo explicito: SIEMPRE normalizado a la red canonica, para que
+        # la misma /24 escrita con bits de host distintos produzca el mismo hash.
+        try:
+            net = ipaddress.ip_network(value, strict=False)
+        except ValueError:
+            return None, None
+        return 'prefix', str(net)
+    if kind == 'prefix':
+        prefix = get_ip_prefix(value)
+        if prefix == 'unknown':
+            return None, None
+        return 'prefix', prefix
+    return 'ip', value
+
+
+def _load_blocked_cache(conn):
+    global _blocked_cache
+    rows = conn.execute(
+        "SELECT ip_hash, kind, key_fp, expires_at FROM blocked_ips WHERE expires_at = 0 OR expires_at > ?",
+        (time.time(),)
+    ).fetchall()
+    active = {}
+    for r in rows:
+        if r['ip_hash']:
+            active['%s:%s:%s' % ((r['kind'] or 'ip'), r['key_fp'] or '', r['ip_hash'])] = r['expires_at']
+    _blocked_cache = (time.time(), active)
+
+
+def _invalidate_blocked_cache():
+    global _blocked_cache
+    _blocked_cache = (0.0, {})
+
+
+def _raw_ip_is_blocked(raw_ip, conn=None):
+    """True si la IP cruda (o su prefijo /24) tiene un bloqueo activo.
+
+    Comprueba el HMAC de la IP exacta y, si el ancho es mayor (prefix),
+    el HMAC del prefijo; nunca compara IPs en claro.
+    """
+    if not raw_ip or raw_ip == 'unknown':
+        return False
+    now = time.time()
+    loaded_at, active = _blocked_cache
+    if now - loaded_at > _BLOCKED_CACHE_TTL:
+        try:
+            if conn is not None:
+                _load_blocked_cache(conn)
+            else:
+                with get_db() as c:
+                    _load_blocked_cache(c)
+            loaded_at, active = _blocked_cache
+        except Exception as e:
+            print('[BLOCK ERROR] refresh: %s' % e)
+        loaded_at, active = _blocked_cache
+    if not active:
+        return False
+    fp = _ip_block_key_fp()
+    if not fp:
+        return False
+    h_exact = _ip_block_hash(raw_ip)
+    candidates = [h_exact]
+    prefix = get_ip_prefix(raw_ip)
+    if prefix != 'unknown' and prefix != raw_ip:
+        candidates.append(_ip_block_hash(prefix))
+    for h in candidates:
+        if not h:
+            continue
+        expires = active.get('ip:' + fp + ':' + h)
+        if expires is None:
+            expires = active.get('prefix:' + fp + ':' + h)
+        if expires is not None and not (expires and expires <= now):
+            return True
+    return False
+
 
 def _cleanup():
     """Removes expired data so the database does not grow indefinitely."""
@@ -582,6 +714,12 @@ def _cleanup():
                 ("request_log", "timestamp", max(3600, ANALYTICS_RETENTION_HOURS * 3600)),
             ]:
                 conn.execute("DELETE FROM %s WHERE %s < ?" % (table, col), (now - window,))
+            # Los bloqueos permanentes (expires_at = 0) no se purgan ahi.
+            conn.execute(
+                "DELETE FROM blocked_ips WHERE expires_at != 0 AND expires_at < ?",
+                (now,)
+            )
+            _invalidate_blocked_cache()
         print("[CLEANUP] Expired data removed")
     except Exception as e:
         print("[CLEANUP ERROR] %s" % e)
@@ -1386,6 +1524,31 @@ def check_client_pattern(ip, solve_time, nonce=None, tenant_id=''):
     return True, None
 
 @app.before_request
+def enforce_ip_block():
+    """Redirige IPs bloqueadas al shield challenge (les niega el acceso sin
+    devolver un 403 seco: quedan atrapadas en un PoW que no pueden resolver).
+
+    Nunca compara contra IPs en claro: hashea la IP entrante con la pepper
+    vigente y verifica contra la lista activa (cache en memoria).
+
+    - /admin/*: exentas (no dejar al operador fuera del dashboard).
+    - /shield/* y /challenge-page: pasan de largo; los handlers emiten el
+      challenge imposible a IPs bloqueadas (bucle sin clearance).
+    """
+    if request.path.startswith('/admin/'):
+        return None
+    if request.path.startswith('/shield/') or request.path == '/challenge-page':
+        return None
+    try:
+        if _raw_ip_is_blocked(_get_raw_client_ip()):
+            next_url = request.full_path if request.query_string else request.path
+            return redirect('/challenge-page?next=' + quote(next_url, safe='/'), code=302)
+    except Exception as e:
+        print('[BLOCK ERROR] %s' % e)
+    return None
+
+
+@app.before_request
 def enforce_proxy_and_cors():
     """Rechaza peticiones con proxy mal configurado y origenes no autorizados."""
     # El widget de protección universal (menta-shield.js) funciona en cualquier
@@ -2006,6 +2169,43 @@ def redeem():
     return jsonify({"success": False, "error": "Incorrect solution"}), 403
 
 
+def _issue_impossible_challenge(ip):
+    """Challenge PoW imposible para IPs bloqueadas.
+
+    Target de 24 ceros (~96 bits): a 100 MH/s tomaria ~10^21 segundos, Practicamente
+    nunca resoluble dentro del TTL de 120 s. La IP queda atrapada en el shield
+    challenge sin obtener clearance (sin mensajes de "bloqueado").
+    """
+    challenge_id = secrets.token_hex(16)
+    salt = secrets.token_hex(8) + ':' + get_ip_prefix(ip)
+    target = '0' * 24
+    ch_expires = time.time() + 120
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO challenges (id, tenant_id, salt, target, created_at, expires) VALUES (?, ?, ?, ?, ?, ?)",
+            (challenge_id, SHIELD_TENANT, salt, target, time.time(), ch_expires)
+        )
+    return jsonify({
+        "success": True,
+        "action": "shield",
+        "token": challenge_id,
+        "challenge": {
+            "salt": salt,
+            "target": target,
+            "expires": ch_expires,
+            "challenge_signature": sign_challenge(challenge_id, salt, target, ch_expires)
+        }
+    })
+
+
+def _raw_ip_blocked_safe():
+    """Devuelve True si la IP cruda esta bloqueada; nunca lanza."""
+    try:
+        return _raw_ip_is_blocked(_get_raw_client_ip())
+    except Exception:
+        return False
+
+
 @app.route('/shield/check', methods=['POST'])
 def shield_check():
     """Widget de protección universal (menta-shield.js): evalúa la petición con
@@ -2032,6 +2232,11 @@ def shield_check():
     if verdict['action'] == 'block':
         log_failure(ip, '/shield/check', 'bot_shield_' + verdict['reason'], tenant_id=SHIELD_TENANT)
         return jsonify({"success": False, "action": "block"}), 403
+
+    # IPs bloqueadas: quedan atrapadas en un PoW imposible (sin clearance)
+    if _raw_ip_blocked_safe():
+        log_failure(ip, '/shield/check', 'ip_blocked_challenged', tenant_id=SHIELD_TENANT)
+        return _issue_impossible_challenge(ip)
 
     # NUEVO: tarpit para bots conocidos
     if verdict['action'] == 'tarpit':
@@ -2092,6 +2297,11 @@ def shield_redeem():
     if not challenge_id or not nonce or not ch_sig:
         return jsonify({"success": False, "error": "Challenge data required."}), 403
 
+    # Una IP bloqueada nunca obtiene clearance, aunque presente una solucion.
+    if _raw_ip_blocked_safe():
+        log_failure(ip, '/shield/redeem', 'ip_blocked', challenge_id, tenant_id=SHIELD_TENANT)
+        return jsonify({"success": False, "error": "Suspicious activity detected."}), 403
+
     with get_db() as conn:
         row = conn.execute(
             "DELETE FROM challenges WHERE id = ? AND tenant_id = ? RETURNING salt, target, created_at, expires",
@@ -2134,6 +2344,10 @@ def shield_verify():
     token = data.get('token')
     if not token:
         return jsonify({"success": False, "valid": False, "error": "token required"}), 400
+
+    # IPs bloqueadas: nunca valida un clearance, incluso si presentan uno emitido antes del bloqueo.
+    if _raw_ip_blocked_safe():
+        return jsonify({"success": True, "valid": False, "error": "ip_blocked"})
 
     if not check_rate_limit_global('/shield/verify', RL_GLOBAL_VERIFY):
         return jsonify({"success": False, "valid": False, "error": "Too many requests."}), 429
@@ -2211,7 +2425,11 @@ def verify_token():
 
 
 def _create_account_from_request(data):
-    """Crea una cuenta de administración a partir de datos. Valida dominio y conflictos."""
+    """Crea una cuenta de administración a partir de datos. Valida dominio y conflictos.
+
+    Acepta ``account_number`` opcional (4-16 dígitos) para usar un número
+    personalizado en vez del generado (16 dígitos aleatorios).
+    """
     domains = data.get('domains', '')
     notes = data.get('notes', '')
     domains = _normalize_domains_input(domains)
@@ -2223,6 +2441,11 @@ def _create_account_from_request(data):
     primary_domain = normalize_domain(primary_input)
     if not primary_domain:
         return jsonify({"error": "A valid domain is required"}), 400
+
+    # número de cuenta personalizado (opcional)
+    custom_number = str(data.get('account_number') or '').strip()
+    if custom_number and not re.fullmatch(r'[0-9]{4,16}', custom_number):
+        return jsonify({"error": "account_number must be 4-16 digits"}), 400
 
     # Check domain conflict across active/locked domains
     conflict = check_domain_conflict(primary_domain)
@@ -2237,7 +2460,19 @@ def _create_account_from_request(data):
     with get_db() as conn:
         # La PK de account_number resuelve la carrera; generate inserta y el
         # UPDATE completa la fila en la misma transacción (sin TOCTOU).
-        account_number = generate_account_number(conn, now)
+        if custom_number:
+            try:
+                conn.execute(
+                    "INSERT INTO accounts (account_number, tenant_id, domains, primary_domain, created_at, last_seen_at, notes) VALUES (?, '', '', '', ?, ?, ?)",
+                    (custom_number, now, now, None)
+                )
+            except Exception as e:
+                if type(e).__name__ == 'IntegrityError':
+                    return jsonify({"error": "Account number already exists."}), 409
+                raise
+            account_number = custom_number
+        else:
+            account_number = generate_account_number(conn, now)
         conn.execute(
             "UPDATE accounts SET tenant_id = ?, domains = ?, primary_domain = ?, created_at = ?, last_seen_at = ?, notes = ? WHERE account_number = ?",
             (account_number, domains, primary_domain, now, now, notes, account_number)
@@ -2419,9 +2654,9 @@ def analytics_data():
     if hours < 0:
         hours = 0
 
-    scope = request.args.get('scope', 'tenant')
-    if scope not in ('tenant', 'shield'):
-        scope = 'tenant'
+    scope = request.args.get('scope', 'all')
+    if scope not in ('all', 'tenant', 'shield'):
+        scope = 'all'
 
     bucket = request.args.get('bucket', 'auto')
     if bucket not in ('auto', 'hour', 'day'):
@@ -2429,13 +2664,24 @@ def analytics_data():
     if bucket == 'auto':
         bucket = 'day' if hours == 0 or hours > 48 else 'hour'
 
-    tenant_id = SHIELD_TENANT if scope == 'shield' else current_tenant()
+    if scope == 'shield':
+        tenant_id = SHIELD_TENANT
+    elif scope == 'all':
+        # Vista de admin: todas las cuentas (el widget atribuye el trafico
+        # via Origin a la cuenta registrada, no al tenant del dashboard).
+        tenant_id = None
+    else:
+        tenant_id = current_tenant()
 
     with get_db() as conn:
         now = time.time()
         cutoff = (now - hours * 3600) if hours > 0 else 0
-        where = "tenant_id = ?" + (" AND timestamp > ?" if hours > 0 else "")
-        params = (tenant_id, cutoff) if hours > 0 else (tenant_id,)
+        if tenant_id is None:
+            where = "1=1" + (" AND timestamp > ?" if hours > 0 else "")
+            params = (cutoff,) if hours > 0 else ()
+        else:
+            where = "tenant_id = ?" + (" AND timestamp > ?" if hours > 0 else "")
+            params = (tenant_id, cutoff) if hours > 0 else (tenant_id,)
 
         totals_row = conn.execute(
             "SELECT COUNT(*) AS requests, COUNT(DISTINCT ip_hash) AS visitors, "
@@ -2528,7 +2774,7 @@ def analytics_data():
             " GROUP BY ip_hash ORDER BY requests DESC LIMIT 25", params
         ).fetchall()
         visitors = [
-            {"label": analytics.pseudonym_label(r["ip_hash"]), "requests": r["requests"]}
+            {"ip_hash": r["ip_hash"], "label": analytics.pseudonym_label(r["ip_hash"]), "requests": r["requests"]}
             for r in visitor_rows
         ]
 
@@ -2536,7 +2782,7 @@ def analytics_data():
             "hours": hours,
             "scope": scope,
             "bucket": bucket,
-            "tenant_id": tenant_id,
+            "tenant_id": tenant_id if tenant_id is not None else '*',
             "geoip_available": analytics.geoip_available(),
             "totals": {
                 "requests": requests_total,
@@ -2725,6 +2971,154 @@ def admin_access_log():
             item["city"] = geo["city"]
             log_items.append(item)
     return jsonify({"success": True, "log": log_items})
+
+
+@app.route('/admin/blocked', methods=['GET'])
+def admin_blocked_list():
+    """Lista de IPs bloqueadas (por pseudonimo HMAC, sin IPs en claro)."""
+    ok, _, setup_required = _admin_authorized(readonly=True)
+    if not ok:
+        if setup_required:
+            return jsonify({"error": "Admin 2FA setup required", "setup_required": True}), 403
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        limit = int(request.args.get('limit', '500'))
+    except (TypeError, ValueError):
+        limit = 500
+    limit = max(1, min(limit, 5000))
+    now = time.time()
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT ip_hash, kind, key_fp, reason, blocked_by, blocked_at, expires_at, hits, last_seen_at "
+            "FROM blocked_ips WHERE expires_at = 0 OR expires_at > ? "
+            "ORDER BY blocked_at DESC LIMIT ?",
+            (now, limit)
+        ).fetchall()
+        current_fp = _ip_block_key_fp()
+        items = []
+        for r in rows:
+            items.append({
+                "ip_hash": r["ip_hash"],
+                "label": analytics.pseudonym_label(r["ip_hash"]),
+                "kind": r["kind"] or 'ip',
+                "active": (r["key_fp"] or '') == current_fp,
+                "reason": r["reason"],
+                "blocked_by": r["blocked_by"],
+                "blocked_at": r["blocked_at"],
+                "expires_at": r["expires_at"] or None,
+                "permanent": not r["expires_at"],
+                "hits": r["hits"],
+                "last_seen_at": r["last_seen_at"] or None,
+            })
+    return jsonify({"success": True, "blocked": items})
+
+
+@app.route('/admin/blocked', methods=['POST'])
+def admin_blocked_add():
+    """Bloquea una IP (raw, prefijo o pseudonimo) por su HMAC: nunca se guarda.
+
+    Body: {"ip": "203.0.113.45", "hours": 24, "reason": "..."} — la IP se hashea
+    aqui y se descarta. Se acepta tambien un prefijo ("203.0.113.0/24" o una IP
+    con kind="prefix") para bloquear el /24 completo, o {"ip_hash": "<hex>"} +
+    kind cuando no se dispone de la IP en claro (pseudonimo de la analitica).
+    hours=0 (o omitido) => permanente.
+    """
+    ok, token_type, setup_required = _admin_authorized(readonly=False)
+    if not ok:
+        if setup_required:
+            return jsonify({"error": "Admin 2FA setup required", "setup_required": True}), 403
+        return jsonify({"error": "Unauthorized"}), 401
+    _log_admin_access('/admin/blocked', token_type)
+
+    data = request.get_json(silent=True) or {}
+    hours = data.get('hours', 24)
+    try:
+        hours = int(hours)
+    except (TypeError, ValueError):
+        hours = 24
+    if hours < 0:
+        hours = 0
+    reason = (data.get('reason') or '')[:256]
+    expires_at = (time.time() + hours * 3600) if hours > 0 else 0
+    now = time.time()
+    current_fp = _ip_block_key_fp()
+    kind = data.get('kind') or ''
+
+    ip_hash = ''
+    if data.get('ip'):
+        kind, target = _resolve_block_target(str(data['ip']), kind or 'ip')
+        if not target:
+            return jsonify({"error": "IP o prefijo invalido"}), 400
+        ip_hash = _ip_block_hash(target)
+        if not ip_hash:
+            return jsonify({"error": "IP invalida"}), 400
+    elif data.get('ip_hash'):
+        ip_hash = str(data['ip_hash']).strip().lower()
+        if not re.fullmatch(r'[0-9a-f]{16,64}', ip_hash):
+            return jsonify({"error": "ip_hash invalido"}), 400
+        ip_hash = ip_hash[:64]
+        if kind not in ('ip', 'prefix'):
+            kind = 'ip'
+    else:
+        return jsonify({"error": "Se requiere 'ip' o 'ip_hash'"}), 400
+
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO blocked_ips (ip_hash, kind, key_fp, reason, blocked_by, blocked_at, expires_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(ip_hash) DO UPDATE SET "
+            "kind = excluded.kind, key_fp = excluded.key_fp, reason = excluded.reason, "
+            "blocked_by = excluded.blocked_by, blocked_at = excluded.blocked_at, "
+            "expires_at = excluded.expires_at",
+            (ip_hash, kind, current_fp, reason, token_type, now, expires_at),
+        )
+    _invalidate_blocked_cache()
+    return jsonify({
+        "success": True,
+        "ip_hash": ip_hash,
+        "label": analytics.pseudonym_label(ip_hash),
+        "kind": kind,
+        "expires_at": expires_at or None,
+        "permanent": not expires_at,
+    })
+
+
+@app.route('/admin/blocked', methods=['DELETE'])
+def admin_blocked_remove():
+    """Desbloquea por pseudonimo (ip_hash) o por IP/prefijo (se hashea al vuelo)."""
+    ok, token_type, setup_required = _admin_authorized(readonly=False)
+    if not ok:
+        if setup_required:
+            return jsonify({"error": "Admin 2FA setup required", "setup_required": True}), 403
+        return jsonify({"error": "Unauthorized"}), 401
+    _log_admin_access('/admin/blocked-unblock', token_type)
+
+    data = request.get_json(silent=True) or {}
+    targets = []
+    if data.get('ip_hash'):
+        h = str(data['ip_hash']).strip().lower()
+        if h:
+            targets.append(h)
+    elif data.get('ip'):
+        kind, target = _resolve_block_target(str(data['ip']), data.get('kind') or 'ip')
+        if target:
+            targets.append(_ip_block_hash(target))
+            if kind == 'ip':
+                # la IP exacta pudo haberse bloqueado tambien como prefijo
+                prefix = get_ip_prefix(target)
+                if prefix != 'unknown' and prefix != target:
+                    targets.append(_ip_block_hash(prefix))
+    if not targets:
+        return jsonify({"error": "Se requiere 'ip_hash' o 'ip'"}), 400
+
+    deleted = 0
+    with get_db() as conn:
+        for t in targets:
+            cur = conn.execute("DELETE FROM blocked_ips WHERE ip_hash = ?", (t,))
+            deleted += max(0, cur.rowcount)
+    if deleted:
+        _invalidate_blocked_cache()
+    return jsonify({"success": True, "removed": bool(deleted)})
 
 
 @app.route('/menta-captcha.js')
@@ -3005,11 +3399,33 @@ SHIELD_JS = r"""(function () {
         ov.id = 'menta-shield-overlay';
         ov.innerHTML = '<div class="ms-card">' +
             (spinner ? '<div class="ms-spin"></div>' : '') +
-            '<p class="ms-title"></p><p class="ms-msg"></p></div>';
+            '<p class="ms-title"></p><p class="ms-msg"></p><p class="ms-stat" style="font-size:11px;color:#9e9e9e;margin:.5rem 0 0;font-variant-numeric:tabular-nums"></p></div>';
         ov.querySelector('.ms-title').textContent = title;
         ov.querySelector('.ms-msg').textContent = msg;
         if (!ov.parentNode) document.body.appendChild(ov);
         return ov;
+    }
+
+    // --- PoW live stats (difficulty + hash speed) ---
+    function difficultyZeros(target) {
+        var t = String(target || '');
+        var m = t.match(/^0*/);
+        return Math.max(1, m ? m[0].length : 0);
+    }
+
+    function fmtSpeed(hps) {
+        if (!isFinite(hps) || hps <= 0) return '—';
+        if (hps >= 1e6) return (hps / 1e6).toFixed(3) + 'MH/s';
+        if (hps >= 1e3) return (hps / 1e3).toFixed(3) + 'kH/s';
+        return Math.max(1, Math.round(hps)) + 'H/s';
+    }
+
+    function setPowStat(target, hashes, elapsedMs) {
+        var ov = document.getElementById('menta-shield-overlay');
+        var el = ov && ov.querySelector('.ms-stat');
+        if (!el) return;
+        var sec = Math.max(1, elapsedMs) / 1000;
+        el.textContent = 'Difficulty: ' + difficultyZeros(target) + ', Speed: ' + fmtSpeed(hashes / sec);
     }
 
     function removeOverlay() {
@@ -3037,12 +3453,22 @@ SHIELD_JS = r"""(function () {
         return Array.from(new Uint8Array(d)).map(x => x.toString(16).padStart(2, '0')).join('');
     }
 
-    async function solvePoW(challenge) {
+    async function solvePoW(challenge, onProgress) {
         let nonce = 0;
+        const start = performance.now();
+        let lastTick = start;
         while (true) {
             const h = await sha256(challenge.salt + nonce);
-            if (h.startsWith(challenge.target)) return nonce;
+            if (h.startsWith(challenge.target)) {
+                if (onProgress) onProgress(nonce + 1, Math.max(1, performance.now() - start));
+                return nonce;
+            }
             nonce++;
+            const now = performance.now();
+            if (onProgress && now - lastTick > 150) {
+                lastTick = now;
+                onProgress(nonce, now - start);
+            }
         }
     }
 
@@ -3066,8 +3492,11 @@ SHIELD_JS = r"""(function () {
 
         if (verdict.action === 'shield' && verdict.challenge) {
             showOverlay(checkingMsg.replace('.', '...'), '', true);
+            setPowStat(verdict.challenge.target, 0, 1);
             try {
-                const nonce = await solvePoW(verdict.challenge);
+                const nonce = await solvePoW(verdict.challenge, function (hashes, ms) {
+                    setPowStat(verdict.challenge.target, hashes, ms);
+                });
                 const v = await fetch(api + '/shield/redeem', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
